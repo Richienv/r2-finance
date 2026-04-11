@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  date      String   // YYYY-MM-DD CST
+  amountRMB Float
+  amountIDR Float
+  category  String   // FOOD | PERSONAL | OTHER | FIXED
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([category])
+}
+
+model MonthlySettings {
+  id           String @id @default(cuid())
+  month        String @unique // YYYY-MM
+  allowanceIDR Int
+  allowanceRMB Float
+  idrPerRmb    Float
+  paydayDay    Int
+}
+
+model FixedCost {
+  id         String  @id @default(cuid())
+  name       String
+  amountRMB  Float
+  billingDay Int?
+  active     Boolean @default(true)
+}
