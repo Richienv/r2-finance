@@ -6,7 +6,6 @@ import { addExpense } from '@/app/actions/expenses';
 import { CATEGORIES, CATEGORY_META, IDR_PER_RMB, type Category } from '@/lib/constants';
 import { formatIDR, rmbToIdr } from '@/lib/money';
 import { cn } from '@/lib/cn';
-import { R2OSLink } from '@/components/R2OSLink';
 
 const CHIPS = [18, 20, 25, 30, 50];
 
@@ -41,10 +40,7 @@ export function AddExpenseForm() {
   return (
     <div className="flex-1 flex flex-col px-5 pt-4 overflow-hidden">
       <div className="mx-auto h-1 w-10 rounded-full bg-border mb-4" />
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl tracking-wider">ADD EXPENSE</h1>
-        <R2OSLink />
-      </div>
+      <h1 className="font-display text-2xl tracking-wider">ADD EXPENSE</h1>
 
       <label className="mt-6 block text-[10px] font-mono tracking-widest text-muted">AMOUNT (RMB)</label>
       <div className="mt-2 flex items-center gap-2 border hairline rounded-md bg-surface px-4 h-16">

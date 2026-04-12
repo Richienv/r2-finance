@@ -5,7 +5,6 @@ import { currentMonthKey } from '@/lib/date';
 import { MONTHLY_ALLOWANCE_IDR, MONTHLY_ALLOWANCE_RMB, IDR_PER_RMB, PAYDAY_DAY } from '@/lib/constants';
 import { upsertSettings, resetMonth, addFixedCost, deleteFixedCost } from '@/app/actions/settings';
 import { formatRMB } from '@/lib/money';
-import { R2OSLink } from '@/components/R2OSLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +23,8 @@ export default async function SettingsPage() {
 
   return (
     <AppShell>
-      <header className="h-[60px] shrink-0 flex items-center justify-between px-4 border-b hairline">
+      <header className="h-[60px] shrink-0 flex items-center px-4 border-b hairline">
         <span className="font-display text-xl tracking-wider">SETTINGS</span>
-        <R2OSLink />
       </header>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-6">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { DM_Sans, DM_Mono, Bebas_Neue } from 'next/font/google';
+import OSButton from '@/components/OSButton';
 import './globals.css';
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
@@ -23,7 +24,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${dmMono.variable} ${bebas.variable}`}>
-      <body className="bg-bg text-white">{children}</body>
+      <body className="bg-bg text-white">
+        {children}
+        <OSButton />
+      </body>
     </html>
   );
 }
