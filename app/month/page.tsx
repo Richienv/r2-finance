@@ -6,6 +6,7 @@ import { getMonthExpenses, sumRMB } from '@/lib/queries';
 import { currentMonthKey, daysUntilPayday } from '@/lib/date';
 import { MONTHLY_ALLOWANCE_RMB, MONTHLY_ALLOWANCE_IDR, VARIABLE_BUDGET, FIXED_COSTS, CATEGORY_META, CATEGORIES, PAYDAY_DAY } from '@/lib/constants';
 import { formatRMB, formatIDR } from '@/lib/money';
+import { R2OSLink } from '@/components/R2OSLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,9 @@ export default async function MonthPage() {
 
   return (
     <AppShell>
-      <header className="h-[60px] shrink-0 flex items-center px-4 border-b hairline">
+      <header className="h-[60px] shrink-0 flex items-center justify-between px-4 border-b hairline">
         <span className="font-display text-xl tracking-wider">{monthLabel}</span>
+        <R2OSLink />
       </header>
 
       <div className="p-4 grid grid-cols-2 gap-3 shrink-0">

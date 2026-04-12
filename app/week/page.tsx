@@ -5,6 +5,7 @@ import { DayRow } from '@/components/DayRow';
 import { getWeekExpenses } from '@/lib/queries';
 import { cstDateString } from '@/lib/date';
 import { formatRMB } from '@/lib/money';
+import { R2OSLink } from '@/components/R2OSLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,10 @@ export default async function WeekPage() {
     <AppShell>
       <header className="h-[60px] shrink-0 flex items-center justify-between px-4 border-b hairline">
         <span className="font-display text-xl tracking-wider">THIS WEEK</span>
-        <span className="font-mono text-[11px] text-muted">{headerLabel}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] text-muted">{headerLabel}</span>
+          <R2OSLink />
+        </div>
       </header>
 
       <WeekChart days={days} totalsByDay={totalsByDay} today={today} />
