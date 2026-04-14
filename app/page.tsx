@@ -1,59 +1,173 @@
 import { AppShell } from '@/components/AppShell';
 import { BottomNav } from '@/components/BottomNav';
-import { BigNumber } from '@/components/BigNumber';
-import { RollingChart } from '@/components/RollingChart';
-import { TodayStrip } from '@/components/TodayStrip';
+import { StatRing } from '@/components/StatRing';
 import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
 import { getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
-import { VARIABLE_BUDGET, IDR_PER_RMB } from '@/lib/constants';
+import {
+  VARIABLE_BUDGET,
+  IDR_PER_RMB,
+  WEEKLY_BUDGET,
+  MONTHLY_FREE,
+} from '@/lib/constants';
 import { remainingFree } from '@/lib/budget';
 import { currentMonthKey, cstDateString } from '@/lib/date';
-import { rmbToIdr } from '@/lib/money';
-import { ensureDailyBudget, getLast7Days } from '@/lib/rolling-budget';
+import { rmbToIdr, formatIDR, formatRMB } from '@/lib/money';
+import { ensureDailyBudget } from '@/lib/rolling-budget';
 
 export const dynamic = 'force-dynamic';
+
+function formatParts(d: Date) {
+  const date = d
+    .toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'Asia/Shanghai',
+    })
+    .toUpperCase()
+    .replace(/(\w+) (\w+) (\d+)/, '$1, $2 $3');
+  const time = d
+    .toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Shanghai',
+    })
+    .toUpperCase();
+  const monthYear = d
+    .toLocaleString('en-US', {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Shanghai',
+    })
+    .toUpperCase();
+  return { date, time, monthYear };
+}
+
+function headline({
+  dayOver,
+  weekOver,
+  monthOver,
+}: { dayOver: boolean; weekOver: boolean; monthOver: boolean }) {
+  if (monthOver) return 'SLOW DOWN.';
+  if (weekOver) return 'EASE UP.';
+  if (dayOver) return 'TOMORROW RESETS.';
+  return 'KEEP GOING.';
+}
 
 export default async function HomePage() {
   const month = currentMonthKey();
   const today = cstDateString();
 
-  const [monthRows, week, todayBudget, last7] = await Promise.all([
+  const [monthRows, week, todayBudget] = await Promise.all([
     getMonthExpenses(month),
     getWeekExpenses(),
     ensureDailyBudget(today),
-    getLast7Days(),
   ]);
 
   const spentFree = sumRMB(monthRows, { excludeFixed: true });
-  const remaining = remainingFree(VARIABLE_BUDGET.freeSpending, spentFree);
-  const idr = rmbToIdr(Math.max(0, remaining), IDR_PER_RMB);
   const weekSpent = sumRMB(week.rows, { excludeFixed: true });
   const monthSpent = spentFree;
+
+  // Day
+  const dayBudget = todayBudget.budgetAmount;
+  const daySpent = todayBudget.spent;
+  const dayLeft = dayBudget - daySpent;
+  const dayPct = dayBudget > 0 ? daySpent / dayBudget : 0;
+  const dayOver = daySpent > dayBudget;
+
+  // Week
+  const weekBudget = WEEKLY_BUDGET;
+  const weekLeft = weekBudget - weekSpent;
+  const weekPct = weekBudget > 0 ? weekSpent / weekBudget : 0;
+  const weekOver = weekSpent > weekBudget;
+
+  // Month
+  const monthBudget = MONTHLY_FREE;
+  const monthLeft = monthBudget - monthSpent;
+  const monthPct = monthBudget > 0 ? monthSpent / monthBudget : 0;
+  const monthOver = monthSpent > monthBudget;
+
+  // Legacy "free spending" IDR conversion — demoted to small caption
+  const freeRemaining = Math.max(0, remainingFree(VARIABLE_BUDGET.freeSpending, spentFree));
+  const idr = rmbToIdr(freeRemaining, IDR_PER_RMB);
+
   const isMonthResetDay = today.endsWith('-01');
+  const now = new Date();
+  const { date: dateLabel, time: timeLabel, monthYear } = formatParts(now);
+
+  const carryover = todayBudget.carryover;
+  let carryNote = '';
+  if (carryover > 0.5) carryNote = `+${Math.round(carryover)} CARRY`;
+  else if (carryover < -0.5) carryNote = `${Math.round(carryover)} CARRY`;
+
+  const subline = [
+    `¥${formatRMB(dayBudget)} BUDGET`,
+    `${formatRMB(Math.max(0, dayLeft))} LEFT`,
+    carryNote || null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <AppShell>
-      <header className="h-[60px] shrink-0 flex items-center justify-between px-4 border-b hairline">
+      {/* HEADER */}
+      <header className="shrink-0 pt-5 px-5 pb-2 flex items-start justify-between">
         <div className="flex flex-col leading-tight">
-          <span className="font-display text-xl tracking-wider">R2·FIT</span>
-          <span className="font-mono text-[10px] tracking-[0.25em] text-muted">FINANCE</span>
+          <span className="font-display text-[22px] tracking-wider text-accent">R2·FIT</span>
+          <span className="mt-1.5 font-mono text-[10px] tracking-[1px] text-[#888]">
+            {dateLabel} · {timeLabel}
+          </span>
+          <span className="mt-1 font-mono text-[10px] tracking-[1px] text-[#555]">
+            {subline}
+          </span>
         </div>
-        <span className="font-mono text-[11px] tracking-widest text-muted uppercase">
-          {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'Asia/Shanghai' })}
+        <span className="font-mono text-[11px] tracking-[2px] text-[#555] uppercase mt-1">
+          {monthYear}
         </span>
       </header>
 
       {isMonthResetDay && <MonthResetBanner />}
 
-      <BigNumber remainingRMB={Math.max(0, remaining)} totalRMB={VARIABLE_BUDGET.freeSpending} idr={idr} />
-      <TodayStrip today={todayBudget} />
-      <RollingChart
-        days={last7}
-        today={today}
-        weekSpent={weekSpent}
-        monthSpent={monthSpent}
-      />
+      {/* MAIN */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div className="font-display text-[32px] tracking-[2px] text-white text-center">
+          {headline({ dayOver, weekOver, monthOver })}
+        </div>
+
+        <div className="mt-8 flex items-start justify-center gap-6">
+          <StatRing
+            value={formatRMB(Math.max(0, dayLeft))}
+            unit="RMB LEFT"
+            pct={dayPct}
+            color="#e8ff47"
+            over={dayOver}
+            label="DAY"
+          />
+          <StatRing
+            value={formatRMB(Math.max(0, weekLeft))}
+            unit="RMB LEFT"
+            pct={weekPct}
+            color="#47d4ff"
+            over={weekOver}
+            label="WEEK"
+          />
+          <StatRing
+            value={formatRMB(Math.max(0, monthLeft))}
+            unit="RMB LEFT"
+            pct={monthPct}
+            color="#ffffff"
+            over={monthOver}
+            label="MONTH"
+          />
+        </div>
+
+        <div className="mt-6 font-mono text-[9px] tracking-[1.5px] text-[#555] text-center">
+          {formatIDR(idr)} · FREE POOL
+        </div>
+      </div>
+
       <QuickAddRow />
       <BottomNav />
     </AppShell>
