@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getMonthExpenses, sumRMB } from '@/lib/queries';
-import { VARIABLE_BUDGET } from '@/lib/constants';
-import { remainingFree } from '@/lib/budget';
+import { ensureDailyBudget } from '@/lib/rolling-budget';
+import { cstDateString } from '@/lib/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,17 +16,20 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const monthRows = await getMonthExpenses();
-    const spentFree = sumRMB(monthRows, { excludeFixed: true });
-    const remaining = Math.max(0, remainingFree(VARIABLE_BUDGET.freeSpending, spentFree));
+    const today = cstDateString();
+    const daily = await ensureDailyBudget(today);
+
+    const spent = Math.round(daily.spent);
+    const remaining = Math.round(daily.budgetAmount - daily.spent);
+    const isOver = remaining < 0;
 
     const summary = {
-      metric: Math.round(remaining).toString(),
+      metric: isOver ? `-${Math.abs(remaining)}` : `+${remaining}`,
       unit: 'RMB',
-      label: 'free budget left',
-      alert: remaining < 100,
-      alertMessage: remaining < 100 ? 'Budget running low' : '',
-      urgency: remaining < 100 ? 'warning' : 'info',
+      label: `${spent} spent today`,
+      alert: isOver,
+      alertMessage: isOver ? 'over budget today' : '',
+      urgency: isOver ? 'warning' : 'info',
     };
 
     return NextResponse.json(summary, { headers: corsHeaders });
