@@ -45,15 +45,10 @@ function formatParts(d: Date) {
   return { date, time, monthYear };
 }
 
-function headline({
-  dayOver,
-  weekOver,
-  monthOver,
-}: { dayOver: boolean; weekOver: boolean; monthOver: boolean }) {
-  if (monthOver) return 'SLOW DOWN.';
-  if (weekOver) return 'EASE UP.';
-  if (dayOver) return 'TOMORROW RESETS.';
-  return 'KEEP GOING.';
+function headline(dayLeft: number): string {
+  if (dayLeft < 0) return 'TOMORROW RESETS.';
+  if (dayLeft === 0) return 'ON TRACK.';
+  return 'GOOD PACE.';
 }
 
 export default async function HomePage() {
@@ -143,7 +138,7 @@ export default async function HomePage() {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          {headline({ dayOver, weekOver, monthOver })}
+          {headline(dayLeft)}
         </div>
 
         <div className="mt-8 flex items-start justify-center gap-6">
@@ -151,24 +146,30 @@ export default async function HomePage() {
             value={dayOver ? `−${formatRMB(Math.abs(dayLeft))}` : formatRMB(dayLeft)}
             unit={dayOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={dayPct}
-            color="#e8ff47"
-            over={dayOver}
+            gradientId="ring-day"
+            gradientFrom={dayOver ? '#ff4444' : '#e8ff47'}
+            gradientTo={dayOver ? '#cc2200' : '#b8cc00'}
+            numberColor={dayOver ? '#ff4444' : '#e8ff47'}
             label="DAY"
           />
           <StatRing
             value={weekOver ? `−${formatRMB(Math.abs(weekLeft))}` : formatRMB(weekLeft)}
             unit={weekOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={weekPct}
-            color="#47d4ff"
-            over={weekOver}
+            gradientId="ring-week"
+            gradientFrom="#e8ff47"
+            gradientTo="#a0c000"
+            numberColor={weekOver ? '#ff4444' : '#e8ff47'}
             label="WEEK"
           />
           <StatRing
             value={monthOver ? `−${formatRMB(Math.abs(monthLeft))}` : formatRMB(monthLeft)}
             unit={monthOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={monthPct}
-            color="#ffffff"
-            over={monthOver}
+            gradientId="ring-month"
+            gradientFrom="#e8ff47"
+            gradientTo="#555500"
+            numberColor={monthOver ? '#ff4444' : '#e8ff47'}
             label="MONTH"
           />
         </div>
