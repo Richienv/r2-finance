@@ -1,37 +1,36 @@
 import { AppShell } from '@/components/AppShell';
 import { BottomNav } from '@/components/BottomNav';
 import { BigNumber } from '@/components/BigNumber';
-import { BudgetStats } from '@/components/BudgetStats';
+import { RollingChart } from '@/components/RollingChart';
+import { TodayStrip } from '@/components/TodayStrip';
+import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
-import { getMonthExpenses, getTodayExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
-import {
-  VARIABLE_BUDGET,
-  IDR_PER_RMB,
-  DAILY_BUDGET,
-  WEEKLY_BUDGET,
-  MONTHLY_FREE,
-} from '@/lib/constants';
+import { getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
+import { VARIABLE_BUDGET, IDR_PER_RMB } from '@/lib/constants';
 import { remainingFree } from '@/lib/budget';
-import { currentMonthKey } from '@/lib/date';
+import { currentMonthKey, cstDateString } from '@/lib/date';
 import { rmbToIdr } from '@/lib/money';
+import { ensureDailyBudget, getLast7Days } from '@/lib/rolling-budget';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const month = currentMonthKey();
-  const [monthRows, todayRows, week] = await Promise.all([
+  const today = cstDateString();
+
+  const [monthRows, week, todayBudget, last7] = await Promise.all([
     getMonthExpenses(month),
-    getTodayExpenses(),
     getWeekExpenses(),
+    ensureDailyBudget(today),
+    getLast7Days(),
   ]);
 
   const spentFree = sumRMB(monthRows, { excludeFixed: true });
   const remaining = remainingFree(VARIABLE_BUDGET.freeSpending, spentFree);
   const idr = rmbToIdr(Math.max(0, remaining), IDR_PER_RMB);
-
-  const todaySpent = sumRMB(todayRows, { excludeFixed: true });
   const weekSpent = sumRMB(week.rows, { excludeFixed: true });
   const monthSpent = spentFree;
+  const isMonthResetDay = today.endsWith('-01');
 
   return (
     <AppShell>
@@ -45,12 +44,13 @@ export default async function HomePage() {
         </span>
       </header>
 
+      {isMonthResetDay && <MonthResetBanner />}
+
       <BigNumber remainingRMB={Math.max(0, remaining)} totalRMB={VARIABLE_BUDGET.freeSpending} idr={idr} />
-      <BudgetStats
-        dailyBudget={DAILY_BUDGET}
-        weeklyBudget={WEEKLY_BUDGET}
-        monthlyBudget={MONTHLY_FREE}
-        todaySpent={todaySpent}
+      <TodayStrip today={todayBudget} />
+      <RollingChart
+        days={last7}
+        today={today}
         weekSpent={weekSpent}
         monthSpent={monthSpent}
       />

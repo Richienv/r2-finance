@@ -36,3 +36,13 @@ model FixedCost {
   billingDay Int?
   active     Boolean @default(true)
 }
+
+model DailyBudget {
+  id           String   @id @default(cuid())
+  date         String   @unique // YYYY-MM-DD CST
+  baseAmount   Float    // always 37
+  carryover    Float    // positive = bonus, negative = debt
+  budgetAmount Float    // clamp(base + carryover, 10, 100)
+  spent        Float    @default(0)
+  updatedAt    DateTime @updatedAt
+}
