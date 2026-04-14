@@ -1,37 +1,36 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import { getMonthExpenses, sumRMB } from '@/lib/queries';
+import { VARIABLE_BUDGET } from '@/lib/constants';
+import { remainingFree } from '@/lib/budget';
+
+export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
-}
+};
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders })
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
 export async function GET() {
   try {
-    const DAILY_FREE_BUDGET = 37
-    const today = new Date()
-    const daysInMonth = new Date(
-      today.getFullYear(),
-      today.getMonth() + 1,
-      0
-    ).getDate()
-    const daysLeft = daysInMonth - today.getDate()
-    const remaining = daysLeft * DAILY_FREE_BUDGET
+    const monthRows = await getMonthExpenses();
+    const spentFree = sumRMB(monthRows, { excludeFixed: true });
+    const remaining = Math.max(0, remainingFree(VARIABLE_BUDGET.freeSpending, spentFree));
 
     const summary = {
-      metric: remaining.toString(),
+      metric: Math.round(remaining).toString(),
       unit: 'RMB',
       label: 'free budget left',
       alert: remaining < 100,
       alertMessage: remaining < 100 ? 'Budget running low' : '',
       urgency: remaining < 100 ? 'warning' : 'info',
-    }
+    };
 
-    return NextResponse.json(summary, { headers: corsHeaders })
+    return NextResponse.json(summary, { headers: corsHeaders });
   } catch {
     return NextResponse.json(
       {
@@ -43,6 +42,6 @@ export async function GET() {
         urgency: 'info',
       },
       { headers: corsHeaders }
-    )
+    );
   }
 }
