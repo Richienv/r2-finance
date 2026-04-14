@@ -138,24 +138,24 @@ export default async function HomePage() {
 
         <div className="mt-8 flex items-start justify-center gap-6">
           <StatRing
-            value={formatRMB(Math.max(0, dayLeft))}
-            unit="RMB LEFT"
+            value={dayOver ? `−${formatRMB(Math.abs(dayLeft))}` : formatRMB(dayLeft)}
+            unit={dayOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={dayPct}
             color="#e8ff47"
             over={dayOver}
             label="DAY"
           />
           <StatRing
-            value={formatRMB(Math.max(0, weekLeft))}
-            unit="RMB LEFT"
+            value={weekOver ? `−${formatRMB(Math.abs(weekLeft))}` : formatRMB(weekLeft)}
+            unit={weekOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={weekPct}
             color="#47d4ff"
             over={weekOver}
             label="WEEK"
           />
           <StatRing
-            value={formatRMB(Math.max(0, monthLeft))}
-            unit="RMB LEFT"
+            value={monthOver ? `−${formatRMB(Math.abs(monthLeft))}` : formatRMB(monthLeft)}
+            unit={monthOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={monthPct}
             color="#ffffff"
             over={monthOver}
