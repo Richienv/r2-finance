@@ -1,7 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { BottomNav } from '@/components/BottomNav';
 import { WeekChart } from '@/components/WeekChart';
-import { DayRow } from '@/components/DayRow';
+import { WeekDayList } from '@/components/WeekDayList';
 import { getWeekExpenses } from '@/lib/queries';
 import { cstDateString } from '@/lib/date';
 import { formatRMB } from '@/lib/money';
@@ -39,20 +39,16 @@ export default async function WeekPage() {
 
       <WeekChart days={days} totalsByDay={totalsByDay} today={today} />
 
-      <div className="flex-1 overflow-y-auto">
-        {days.map(d => (
-          <DayRow
-            key={d}
-            day={{
-              date: d,
-              label: labelFor(d),
-              total: totalsByDay[d],
-              expenses: byDay[d],
-              isToday: d === today,
-            }}
-          />
-        ))}
-      </div>
+      <WeekDayList
+        today={today}
+        days={days.map(d => ({
+          date: d,
+          label: labelFor(d),
+          total: totalsByDay[d],
+          expenses: byDay[d],
+          isToday: d === today,
+        }))}
+      />
 
       <div className="h-10 shrink-0 flex items-center justify-center border-t hairline font-mono text-[10px] tracking-widest text-muted">
         WEEK TOTAL: {formatRMB(weekTotal)} RMB · AVG {avg}/DAY

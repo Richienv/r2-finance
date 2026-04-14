@@ -2,22 +2,22 @@
 import Link from 'next/link';
 
 const quick = [
-  { cat: 'FOOD',     label: 'FOOD',     emoji: '🍜' },
-  { cat: 'PERSONAL', label: 'PERSONAL', emoji: '🛍️' },
-  { cat: 'OTHER',    label: 'OTHER',    emoji: '📦' },
-];
+  { cat: 'FOOD',     label: 'FOOD' },
+  { cat: 'SNACKS',   label: 'SNACKS' },
+  { cat: 'PERSONAL', label: 'PERSONAL' },
+  { cat: 'OTHER',    label: 'OTHER' },
+] as const;
 
 export function QuickAddRow() {
   return (
-    <div className="grid grid-cols-3 gap-2 px-4 py-3 shrink-0">
+    <div className="grid grid-cols-4 gap-2 px-4 py-3 shrink-0">
       {quick.map(q => (
         <Link
           key={q.cat}
           href={`/add?cat=${q.cat}`}
-          className="flex flex-col items-center justify-center h-16 rounded-md bg-surface border hairline active:scale-[0.98] transition-transform"
+          className="flex items-center justify-center h-11 rounded-full bg-[#111] border-[0.5px] border-[#222] font-mono text-[11px] tracking-[1.5px] uppercase text-[#F0F0F0] active:bg-accent active:text-[#080808] active:border-accent transition-colors"
         >
-          <span className="text-xl leading-none">{q.emoji}</span>
-          <span className="mt-1 font-mono text-[10px] tracking-wider text-muted">{q.label}</span>
+          {q.label}
         </Link>
       ))}
     </div>

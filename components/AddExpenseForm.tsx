@@ -26,17 +26,19 @@ function todayLabel(): string {
 export function AddExpenseForm() {
   const router = useRouter();
   const sp = useSearchParams();
-  const initialCat = (sp.get('cat') as Category) ?? 'FOOD';
+  const rawCat = sp.get('cat') as Category | null;
+  const initialCat: Category =
+    rawCat && (CATEGORIES as readonly string[]).includes(rawCat) ? rawCat : 'FOOD';
 
   const [step, setStep] = useState<1 | 2>(1);
   const [amount, setAmount] = useState<number>(0);
-  const [category, setCategory] = useState<Category>(
-    CATEGORIES.includes(initialCat) ? initialCat : 'FOOD',
-  );
+  const category: Category = initialCat;
   const [note, setNote] = useState('');
+  const [noteShake, setNoteShake] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+  const noteRef = useRef<HTMLInputElement | null>(null);
 
   const idrPreview = amount > 0 ? rmbToIdr(amount, IDR_PER_RMB) : 0;
   const canNext = amount >= MIN_AMOUNT;
@@ -55,6 +57,7 @@ export function AddExpenseForm() {
     if (!canNext) return;
     setError(null);
     setStep(2);
+    setTimeout(() => noteRef.current?.focus(), 280);
   }
 
   function goBack() {
@@ -64,23 +67,36 @@ export function AddExpenseForm() {
   function submit() {
     setError(null);
     if (!(amount >= MIN_AMOUNT)) { setError('Enter an amount'); return; }
+    const trimmed = note.trim();
+    if (!trimmed) {
+      setError('add a note');
+      setNoteShake(true);
+      vibrate([20, 40, 20]);
+      setTimeout(() => setNoteShake(false), 420);
+      noteRef.current?.focus();
+      return;
+    }
     startTransition(async () => {
       try {
-        await addExpense({ amountRMB: amount, category, note });
+        await addExpense({ amountRMB: amount, category, note: trimmed });
         vibrate([10, 50, 10]);
         setFlash(true);
-        setTimeout(() => router.push('/'), 180);
+        setTimeout(() => router.push('/'), 500);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed');
       }
     });
   }
 
+  const meta = CATEGORY_META[category];
+
   return (
     <div className="flex-1 relative overflow-hidden bg-bg">
       {/* success flash */}
       {flash && (
-        <div className="absolute inset-0 z-50 pointer-events-none animate-pulse" style={{ background: '#E8FF4730' }} />
+        <div className="absolute inset-0 z-50 pointer-events-none flex items-center justify-center" style={{ background: '#E8FF4720' }}>
+          <div className="font-display text-4xl tracking-wider text-accent">✓ ADDED</div>
+        </div>
       )}
 
       {/* sliding rail */}
@@ -92,7 +108,11 @@ export function AddExpenseForm() {
         <section className="w-1/2 h-full flex flex-col">
           <Header
             left={<button onClick={() => router.back()} className="font-mono text-[10px] tracking-widest text-[#444]">← CANCEL</button>}
-            center={<span className="font-display text-base tracking-wider text-[#F0F0F0]">ADD EXPENSE</span>}
+            center={
+              <span className="font-mono text-[11px] tracking-[2px] text-accent uppercase">
+                {meta.label}
+              </span>
+            }
           />
 
           {/* hero amount */}
@@ -156,46 +176,30 @@ export function AddExpenseForm() {
             center={<span className="font-display text-xl tracking-wider text-accent">¥ {amount % 1 === 0 ? amount : amount.toFixed(1)}</span>}
           />
 
-          {/* category */}
+          {/* locked category */}
           <div className="px-4 mt-5">
-            <div className="font-mono text-[9px] tracking-[2px] text-[#444] mb-3">CATEGORY</div>
-            <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map(c => {
-                const m = CATEGORY_META[c];
-                const active = category === c;
-                return (
-                  <button
-                    key={c}
-                    onClick={() => { setCategory(c); vibrate(10); }}
-                    className={cn(
-                      'h-20 rounded-lg flex flex-col items-center justify-center gap-1.5',
-                      active
-                        ? 'border-[1.5px]'
-                        : 'bg-[#111] border-[0.5px] border-[#222]',
-                    )}
-                    style={active ? { background: '#E8FF4715', borderColor: '#E8FF47' } : undefined}
-                  >
-                    <span className="text-2xl leading-none">{m.emoji}</span>
-                    <span
-                      className="font-display text-base tracking-wider"
-                      style={{ color: active ? '#E8FF47' : '#F0F0F0' }}
-                    >
-                      {m.label.toUpperCase()}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="font-mono text-[9px] tracking-[2px] text-[#444] mb-2">CATEGORY</div>
+            <div
+              className="h-12 rounded-lg flex items-center justify-center font-mono text-[12px] tracking-[2px]"
+              style={{ background: '#E8FF4715', border: '1px solid #E8FF47', color: '#E8FF47' }}
+            >
+              {meta.label.toUpperCase()}
             </div>
           </div>
 
           {/* note */}
           <div className="px-4 mt-5">
-            <div className="font-mono text-[9px] tracking-[2px] text-[#444] mb-2">NOTE (OPTIONAL)</div>
+            <div className="font-mono text-[9px] tracking-[2px] text-[#444] mb-2">NOTE</div>
             <input
+              ref={noteRef}
               value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="lunch at cafeteria..."
-              className="w-full h-12 px-3.5 rounded-lg bg-[#111] border-[0.5px] border-[#222] outline-none text-sm text-[#F0F0F0] placeholder:text-[#444]"
+              onChange={e => { setNote(e.target.value); if (error) setError(null); }}
+              placeholder="what did you buy?"
+              className={cn(
+                'w-full h-12 px-3.5 rounded-lg bg-[#111] border-[0.5px] outline-none text-sm text-[#F0F0F0] placeholder:text-[#444]',
+                noteShake ? 'shake-x' : '',
+              )}
+              style={{ borderColor: noteShake ? '#ff4747' : '#222' }}
             />
           </div>
 

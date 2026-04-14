@@ -15,18 +15,22 @@ export const VARIABLE_BUDGET = {
   freeSpending: 1120,
 } as const;
 
+export const DAILY_BUDGET = 37;
 export const DAILY_FREE_BUDGET = 37;
+export const WEEKLY_BUDGET = 259;
+export const MONTHLY_FREE = 1820;
+
 export const IDR_PER_RMB = 2174;
 export const PAYDAY_DAY = 1;
 
-export const CATEGORIES = ['FOOD', 'PERSONAL', 'OTHER', 'FIXED'] as const;
+export const CATEGORIES = ['FOOD', 'SNACKS', 'PERSONAL', 'OTHER'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-export const CATEGORY_META: Record<Category, { label: string; emoji: string; color: string }> = {
-  FOOD:     { label: 'Food',     emoji: '🍜', color: '#e8ff47' },
-  PERSONAL: { label: 'Personal', emoji: '🛍️', color: '#8b47ff' },
-  OTHER:    { label: 'Other',    emoji: '📦', color: '#888888' },
-  FIXED:    { label: 'Fixed',    emoji: '🏠', color: '#ff6b35' },
+export const CATEGORY_META: Record<Category, { label: string; color: string }> = {
+  FOOD:     { label: 'Food',     color: '#e8ff47' },
+  SNACKS:   { label: 'Snacks',   color: '#47d4ff' },
+  PERSONAL: { label: 'Personal', color: '#8b47ff' },
+  OTHER:    { label: 'Other',    color: '#888888' },
 };
 
 export const GYM_BILLING_MONTHS = [1, 4, 7, 10]; // quarterly

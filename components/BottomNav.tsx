@@ -6,32 +6,45 @@ import { cn } from '@/lib/cn';
 const OS_URL = 'https://r2-os.vercel.app';
 
 const leftItems = [
-  { href: '/',    label: 'HOME', icon: '🏠' },
-  { href: '/add', label: 'ADD',  icon: '➕' },
+  { href: '/',    label: 'HOME' },
+  { href: '/add', label: 'ADD'  },
 ];
 
 const rightItems = [
-  { href: '/week',     label: 'WEEK',     icon: '📊' },
-  { href: '/settings', label: 'SETTINGS', icon: '⚙️' },
+  { href: '/week',     label: 'WEEK'     },
+  { href: '/settings', label: 'SETTINGS' },
 ];
+
+function NavItem({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'relative flex-1 h-full flex items-center justify-center font-mono text-[11px] tracking-[1.5px]',
+        active ? 'text-accent' : 'text-[#555]',
+      )}
+    >
+      {active && (
+        <span
+          className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8"
+          style={{ background: '#e8ff47' }}
+        />
+      )}
+      {label}
+    </Link>
+  );
+}
 
 export function BottomNav() {
   const path = usePathname();
 
   return (
-    <nav className="h-16 shrink-0 flex items-center border-t hairline bg-surface overflow-visible">
+    <nav
+      className="h-16 shrink-0 flex items-center overflow-visible"
+      style={{ background: '#111', borderTop: '1px solid #2a2a2a' }}
+    >
       {leftItems.map(i => (
-        <Link
-          key={i.href}
-          href={i.href}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] tracking-wider',
-            path === i.href ? 'text-accent' : 'text-muted',
-          )}
-        >
-          <span className="text-lg leading-none">{i.icon}</span>
-          <span className="font-mono">{i.label}</span>
-        </Link>
+        <NavItem key={i.href} href={i.href} label={i.label} active={path === i.href} />
       ))}
 
       {/* CENTER OS BUTTON */}
@@ -65,17 +78,7 @@ export function BottomNav() {
       </div>
 
       {rightItems.map(i => (
-        <Link
-          key={i.href}
-          href={i.href}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] tracking-wider',
-            path === i.href ? 'text-accent' : 'text-muted',
-          )}
-        >
-          <span className="text-lg leading-none">{i.icon}</span>
-          <span className="font-mono">{i.label}</span>
-        </Link>
+        <NavItem key={i.href} href={i.href} label={i.label} active={path === i.href} />
       ))}
     </nav>
   );
