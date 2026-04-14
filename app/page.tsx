@@ -132,7 +132,17 @@ export default async function HomePage() {
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div className="font-display text-[32px] tracking-[2px] text-white text-center">
+        <div
+          className="font-display text-[32px] tracking-[2px] text-center"
+          style={{
+            backgroundImage:
+              'linear-gradient(180deg, #f6ffa0 0%, #e8ff47 45%, #b8cc30 100%)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            color: 'transparent',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
           {headline({ dayOver, weekOver, monthOver })}
         </div>
 
