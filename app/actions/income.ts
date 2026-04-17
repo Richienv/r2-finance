@@ -5,9 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { cstDateString, currentMonthKey } from '@/lib/date';
 import { rmbToIdr } from '@/lib/money';
 import { IDR_PER_RMB } from '@/lib/constants';
-
-export const INCOME_SOURCES = ['SALARY', 'BONUS', 'SIDE', 'OTHER'] as const;
-export type IncomeSource = (typeof INCOME_SOURCES)[number];
+import { INCOME_SOURCES, type IncomeSource } from '@/lib/income';
 
 type AddIncomeInput = {
   amountRMB: number;

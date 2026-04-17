@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { addIncome, deleteIncome, INCOME_SOURCES, type IncomeSource } from '@/app/actions/income';
+import { addIncome, deleteIncome } from '@/app/actions/income';
+import { INCOME_SOURCES, type IncomeSource } from '@/lib/income';
 import { formatRMB } from '@/lib/money';
 import { cn } from '@/lib/cn';
 
