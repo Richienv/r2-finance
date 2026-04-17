@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { formatRMB } from '@/lib/money';
 import { cn } from '@/lib/cn';
-import { deleteExpense } from '@/app/actions/expenses';
+import { deleteExpense, updateExpense } from '@/app/actions/expenses';
 
 type Expense = { id: string; note: string | null; amountRMB: number; category: string };
 export type Day = { date: string; label: string; total: number; expenses: Expense[]; isToday: boolean };
@@ -52,9 +52,14 @@ function ExpenseRow({ expense }: { expense: Expense }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [deleted, setDeleted] = useState(false);
   const startX = useRef<number | null>(null);
+  const movedRef = useRef(false);
+
+  const [amountInput, setAmountInput] = useState(String(expense.amountRMB));
+  const [noteInput, setNoteInput] = useState(expense.note ?? '');
 
   useEffect(() => {
     if (!confirming) return;
@@ -63,12 +68,15 @@ function ExpenseRow({ expense }: { expense: Expense }) {
   }, [confirming]);
 
   function onPointerDown(e: React.PointerEvent) {
+    if (editing) return;
     startX.current = e.clientX;
+    movedRef.current = false;
     setDragging(true);
   }
   function onPointerMove(e: React.PointerEvent) {
     if (startX.current == null) return;
     const d = e.clientX - startX.current;
+    if (Math.abs(d) > 3) movedRef.current = true;
     if (d < 0) setDx(Math.max(-96, d));
   }
   function onPointerUp() {
@@ -95,7 +103,62 @@ function ExpenseRow({ expense }: { expense: Expense }) {
     });
   }
 
+  function openEdit() {
+    if (movedRef.current || confirming) return;
+    setAmountInput(String(expense.amountRMB));
+    setNoteInput(expense.note ?? '');
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    const amt = parseFloat(amountInput);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    startTransition(async () => {
+      try {
+        await updateExpense({ id: expense.id, amountRMB: amt, note: noteInput });
+        setEditing(false);
+      } catch {}
+    });
+  }
+
   if (deleted) return null;
+
+  if (editing) {
+    return (
+      <li className="bg-[#0d0d0d] px-5 py-2 flex items-center gap-2 border-y-[0.5px] border-[#222]">
+        <span className="font-mono text-[9px] tracking-[1px] uppercase text-[#555] shrink-0">
+          {expense.category}
+        </span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={amountInput}
+          onChange={e => setAmountInput(e.target.value)}
+          className="w-16 bg-[#111] border-[0.5px] border-[#222] rounded px-2 py-1 font-mono text-[12px] text-[#e8ff47] outline-none tabular-nums"
+        />
+        <input
+          type="text"
+          value={noteInput}
+          onChange={e => setNoteInput(e.target.value)}
+          placeholder="note"
+          className="flex-1 min-w-0 bg-[#111] border-[0.5px] border-[#222] rounded px-2 py-1 font-sans text-[12px] text-white outline-none"
+        />
+        <button
+          onClick={saveEdit}
+          disabled={pending}
+          className="font-mono text-[10px] tracking-wider text-[#080808] bg-accent px-2 py-1 rounded"
+        >
+          {pending ? '…' : 'SAVE'}
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="font-mono text-[10px] tracking-wider text-[#888] px-1"
+        >
+          ✕
+        </button>
+      </li>
+    );
+  }
 
   return (
     <li className="relative overflow-hidden">
@@ -111,7 +174,8 @@ function ExpenseRow({ expense }: { expense: Expense }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="relative bg-bg pl-8 pr-5 py-1.5 flex items-center justify-between touch-pan-y"
+        onClick={openEdit}
+        className="relative bg-bg pl-8 pr-5 py-1.5 flex items-center justify-between touch-pan-y cursor-pointer"
         style={{
           transform: `translateX(${dx}px)`,
           transition: dragging ? undefined : 'transform 180ms ease-out',

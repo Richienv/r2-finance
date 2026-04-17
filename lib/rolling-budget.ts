@@ -74,7 +74,7 @@ export async function ensureDailyBudget(date: string): Promise<RollingDay> {
     const prev = await prisma.dailyBudget.findUnique({ where: { date: yesterday } });
     if (prev) {
       const prevSpent = await spentOnDate(yesterday);
-      carryover = prev.budgetAmount - prevSpent;
+      carryover = Math.max(0, prev.budgetAmount - prevSpent);
     }
   }
 

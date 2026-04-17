@@ -37,6 +37,19 @@ model FixedCost {
   active     Boolean @default(true)
 }
 
+model Income {
+  id        String   @id @default(cuid())
+  date      String   // YYYY-MM-DD CST
+  amountRMB Float
+  amountIDR Float
+  source    String   // SALARY | BONUS | SIDE | OTHER
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([source])
+}
+
 model DailyBudget {
   id           String   @id @default(cuid())
   date         String   @unique // YYYY-MM-DD CST

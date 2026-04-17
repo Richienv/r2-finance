@@ -48,3 +48,30 @@ export async function deleteExpense(id: string) {
   revalidatePath('/week');
   revalidatePath('/month');
 }
+
+type UpdateExpenseInput = {
+  id: string;
+  amountRMB: number;
+  note?: string;
+};
+
+export async function updateExpense(input: UpdateExpenseInput) {
+  if (!Number.isFinite(input.amountRMB) || input.amountRMB <= 0) {
+    throw new Error('amountRMB must be > 0');
+  }
+  const settings = await prisma.monthlySettings.findUnique({
+    where: { month: currentMonthKey() },
+  });
+  const rate = settings?.idrPerRmb ?? IDR_PER_RMB;
+  await prisma.expense.update({
+    where: { id: input.id },
+    data: {
+      amountRMB: input.amountRMB,
+      amountIDR: rmbToIdr(input.amountRMB, rate),
+      note: input.note?.trim() || null,
+    },
+  });
+  revalidatePath('/');
+  revalidatePath('/week');
+  revalidatePath('/month');
+}
