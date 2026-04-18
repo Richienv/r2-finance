@@ -7,6 +7,7 @@ type Props = {
   gradientTo: string;
   numberColor: string;
   label: string;
+  over?: boolean;
 };
 
 export function StatRing({
@@ -18,12 +19,14 @@ export function StatRing({
   gradientTo,
   numberColor,
   label,
+  over = false,
 }: Props) {
   const size = 120;
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(1, pct));
+  // When over-budget, ring is fully drawn to signal "all used up".
+  const clamped = over ? 1 : Math.max(0, Math.min(1, pct));
   const offset = c * (1 - clamped);
 
   return (

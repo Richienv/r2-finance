@@ -150,6 +150,7 @@ export default async function HomePage() {
             value={dayOver ? `−${formatRMB(Math.abs(dayLeft))}` : formatRMB(dayLeft)}
             unit={dayOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={dayPct}
+            over={dayOver}
             gradientId="ring-day"
             gradientFrom={dayOver ? '#ff4444' : '#e8ff47'}
             gradientTo={dayOver ? '#cc2200' : '#b8cc00'}
@@ -160,9 +161,10 @@ export default async function HomePage() {
             value={weekOver ? `−${formatRMB(Math.abs(weekLeft))}` : formatRMB(weekLeft)}
             unit={weekOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={weekPct}
+            over={weekOver}
             gradientId="ring-week"
-            gradientFrom="#e8ff47"
-            gradientTo="#a0c000"
+            gradientFrom={weekOver ? '#ff4444' : '#e8ff47'}
+            gradientTo={weekOver ? '#cc2200' : '#a0c000'}
             numberColor={weekOver ? '#ff4444' : '#e8ff47'}
             label="WEEK"
           />
@@ -170,9 +172,10 @@ export default async function HomePage() {
             value={monthOver ? `−${formatRMB(Math.abs(monthLeft))}` : formatRMB(monthLeft)}
             unit={monthOver ? 'RMB OVER' : 'RMB LEFT'}
             pct={monthPct}
+            over={monthOver}
             gradientId="ring-month"
-            gradientFrom="#e8ff47"
-            gradientTo="#555500"
+            gradientFrom={monthOver ? '#ff4444' : '#e8ff47'}
+            gradientTo={monthOver ? '#cc2200' : '#555500'}
             numberColor={monthOver ? '#ff4444' : '#e8ff47'}
             label="MONTH"
           />
