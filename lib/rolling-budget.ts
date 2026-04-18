@@ -55,7 +55,9 @@ async function rebuildChain(upTo: string): Promise<RollingDay[]> {
   let prevSpent = 0;
   for (let i = 0; i < dates.length; i++) {
     const d = dates[i];
-    const carryover = i === 0 ? 0 : prevBudget - prevSpent;
+    // Only overspend (sin) carries forward. Surplus days reset to base 37.
+    const rawCarry = i === 0 ? 0 : prevBudget - prevSpent;
+    const carryover = Math.min(0, rawCarry);
     const budgetAmount = DAILY_BUDGET + carryover;
     const spent = spentMap[d];
     out.push({
