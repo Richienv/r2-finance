@@ -2,9 +2,6 @@ import { prisma } from '@/lib/prisma';
 import { cstDateString } from '@/lib/date';
 import { DAILY_BUDGET } from '@/lib/constants';
 
-export const MIN_DAILY_BUDGET = 10;
-export const MAX_DAILY_BUDGET = 100;
-
 export type RollingDay = {
   date: string;
   baseAmount: number;
@@ -14,132 +11,107 @@ export type RollingDay = {
   remaining: number;
 };
 
-export function clampBudget(value: number): number {
-  return Math.min(MAX_DAILY_BUDGET, Math.max(MIN_DAILY_BUDGET, value));
-}
-
-function prevDateString(date: string): string {
+function nextDateString(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   const base = new Date(Date.UTC(y, m - 1, d));
-  base.setUTCDate(base.getUTCDate() - 1);
+  base.setUTCDate(base.getUTCDate() + 1);
   const yy = base.getUTCFullYear();
   const mm = String(base.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(base.getUTCDate()).padStart(2, '0');
   return `${yy}-${mm}-${dd}`;
 }
 
-function isFirstOfMonth(date: string): boolean {
-  return date.endsWith('-01');
-}
-
-async function spentOnDate(date: string): Promise<number> {
-  const rows = await prisma.expense.findMany({
-    where: { date },
-    select: { amountRMB: true, category: true },
-  });
-  return rows
-    .filter(r => r.category !== 'FIXED')
-    .reduce((s, r) => s + r.amountRMB, 0);
+function monthStartOf(date: string): string {
+  return date.slice(0, 7) + '-01';
 }
 
 /**
- * Ensure a DailyBudget row exists for `date`, deriving carryover from the
- * prior day. Updates `spent` from the live Expense table. Month reset on the 1st.
+ * Rebuild the rolling-budget chain from the start of the month up to `upTo`.
+ * Overspend compounds: if a prior day overspent, the deficit reduces the next
+ * day's budget. Month boundary resets carry to 0.
+ * Persists every computed day so historical reads stay consistent.
  */
-export async function ensureDailyBudget(date: string): Promise<RollingDay> {
-  const existing = await prisma.dailyBudget.findUnique({ where: { date } });
-  const spent = await spentOnDate(date);
-
-  if (existing) {
-    if (existing.spent !== spent) {
-      await prisma.dailyBudget.update({
-        where: { date },
-        data: { spent },
-      });
-    }
-    return {
-      date,
-      baseAmount: existing.baseAmount,
-      carryover: existing.carryover,
-      budgetAmount: existing.budgetAmount,
-      spent,
-      remaining: existing.budgetAmount - spent,
-    };
+async function rebuildChain(upTo: string): Promise<RollingDay[]> {
+  const start = monthStartOf(upTo);
+  const dates: string[] = [];
+  let cur = start;
+  while (cur <= upTo) {
+    dates.push(cur);
+    cur = nextDateString(cur);
   }
 
-  // Compute carryover from yesterday (unless month reset)
-  let carryover = 0;
-  if (!isFirstOfMonth(date)) {
-    const yesterday = prevDateString(date);
-    const prev = await prisma.dailyBudget.findUnique({ where: { date: yesterday } });
-    if (prev) {
-      const prevSpent = await spentOnDate(yesterday);
-      carryover = Math.max(0, prev.budgetAmount - prevSpent);
-    }
+  const rows = await prisma.expense.findMany({
+    where: { date: { in: dates } },
+    select: { date: true, amountRMB: true, category: true },
+  });
+  const spentMap: Record<string, number> = Object.fromEntries(dates.map(d => [d, 0]));
+  for (const r of rows) {
+    if (r.category === 'FIXED') continue;
+    spentMap[r.date] = (spentMap[r.date] ?? 0) + r.amountRMB;
   }
 
-  const budgetAmount = clampBudget(DAILY_BUDGET + carryover);
-
-  await prisma.dailyBudget.create({
-    data: {
-      date,
+  const out: RollingDay[] = [];
+  let prevBudget = 0;
+  let prevSpent = 0;
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const carryover = i === 0 ? 0 : prevBudget - prevSpent;
+    const budgetAmount = DAILY_BUDGET + carryover;
+    const spent = spentMap[d];
+    out.push({
+      date: d,
       baseAmount: DAILY_BUDGET,
       carryover,
       budgetAmount,
       spent,
-    },
-  });
-
-  return {
-    date,
-    baseAmount: DAILY_BUDGET,
-    carryover,
-    budgetAmount,
-    spent,
-    remaining: budgetAmount - spent,
-  };
-}
-
-/**
- * Return rolling budget data for the last 7 days ending at `endDate` (inclusive).
- * Lazily backfills DailyBudget rows in order so carryover chains correctly.
- */
-export async function getLast7Days(endDate: string = cstDateString()): Promise<RollingDay[]> {
-  const dates: string[] = [];
-  let cursor = endDate;
-  for (let i = 0; i < 7; i++) {
-    dates.unshift(cursor);
-    cursor = prevDateString(cursor);
+      remaining: budgetAmount - spent,
+    });
+    prevBudget = budgetAmount;
+    prevSpent = spent;
   }
 
-  const results: RollingDay[] = [];
-  for (const d of dates) {
-    // Only create today; for historical days, return a derived view without upserting.
-    if (d === endDate) {
-      results.push(await ensureDailyBudget(d));
-    } else {
-      const row = await prisma.dailyBudget.findUnique({ where: { date: d } });
-      const spent = await spentOnDate(d);
-      if (row) {
-        results.push({
-          date: d,
+  await Promise.all(
+    out.map(row =>
+      prisma.dailyBudget.upsert({
+        where: { date: row.date },
+        create: {
+          date: row.date,
           baseAmount: row.baseAmount,
           carryover: row.carryover,
           budgetAmount: row.budgetAmount,
-          spent,
-          remaining: row.budgetAmount - spent,
-        });
-      } else {
-        results.push({
-          date: d,
-          baseAmount: DAILY_BUDGET,
-          carryover: 0,
-          budgetAmount: DAILY_BUDGET,
-          spent,
-          remaining: DAILY_BUDGET - spent,
-        });
-      }
-    }
+          spent: row.spent,
+        },
+        update: {
+          baseAmount: row.baseAmount,
+          carryover: row.carryover,
+          budgetAmount: row.budgetAmount,
+          spent: row.spent,
+        },
+      }),
+    ),
+  );
+
+  return out;
+}
+
+export async function ensureDailyBudget(date: string): Promise<RollingDay> {
+  const chain = await rebuildChain(date);
+  return chain[chain.length - 1];
+}
+
+export async function getLast7Days(endDate: string = cstDateString()): Promise<RollingDay[]> {
+  const chain = await rebuildChain(endDate);
+  const last7 = chain.slice(-7);
+  while (last7.length < 7) {
+    // Pad with earlier (previous month) days as zero-spent placeholders.
+    last7.unshift({
+      date: '',
+      baseAmount: DAILY_BUDGET,
+      carryover: 0,
+      budgetAmount: DAILY_BUDGET,
+      spent: 0,
+      remaining: DAILY_BUDGET,
+    });
   }
-  return results;
+  return last7;
 }
