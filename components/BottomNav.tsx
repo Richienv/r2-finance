@@ -6,8 +6,8 @@ import { cn } from '@/lib/cn';
 const OS_URL = 'https://r2-os.vercel.app';
 
 const leftItems = [
-  { href: '/',    label: 'HOME', icon: '🏠' },
-  { href: '/add', label: 'ADD',  icon: '💰' },
+  { href: '/',      label: 'HOME',  icon: '🏠' },
+  { href: '/macro', label: 'MACRO', icon: '📈' },
 ];
 
 const rightItems = [

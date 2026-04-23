@@ -59,3 +59,17 @@ model DailyBudget {
   spent        Float    @default(0)
   updatedAt    DateTime @updatedAt
 }
+
+model Macro {
+  id        String   @id @default(cuid())
+  date      String   // YYYY-MM-DD CST
+  amountRMB Float
+  amountIDR Float
+  type      String   // INCOME | EXPENSE
+  category  String   // see lib/macro.ts
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([type])
+}

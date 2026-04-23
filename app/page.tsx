@@ -1,11 +1,9 @@
-import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { BottomNav } from '@/components/BottomNav';
 import { StatRing } from '@/components/StatRing';
 import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
 import { getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
-import { getMonthIncome } from '@/app/actions/income';
 import {
   VARIABLE_BUDGET,
   IDR_PER_RMB,
@@ -57,13 +55,11 @@ export default async function HomePage() {
   const month = currentMonthKey();
   const today = cstDateString();
 
-  const [monthRows, week, todayBudget, incomeRows] = await Promise.all([
+  const [monthRows, week, todayBudget] = await Promise.all([
     getMonthExpenses(month),
     getWeekExpenses(),
     ensureDailyBudget(today),
-    getMonthIncome(month),
   ]);
-  const monthIncome = incomeRows.reduce((s, r) => s + r.amountRMB, 0);
 
   const spentFree = sumRMB(monthRows, { excludeFixed: true });
   const weekSpent = sumRMB(week.rows, { excludeFixed: true });
@@ -184,13 +180,6 @@ export default async function HomePage() {
         <div className="mt-6 font-mono text-[9px] tracking-[1.5px] text-[#555] text-center">
           {formatIDR(idr)} · FREE POOL
         </div>
-        <Link
-          href="/income"
-          className="mt-2 font-mono text-[10px] tracking-[1.5px] text-center"
-          style={{ color: monthIncome > 0 ? '#e8ff47' : '#555' }}
-        >
-          {monthIncome > 0 ? `+${formatRMB(monthIncome)} INCOME THIS MONTH →` : '+ LOG INCOME / BONUS →'}
-        </Link>
       </div>
 
       <QuickAddRow />
