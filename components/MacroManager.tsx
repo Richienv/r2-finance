@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { addMacro, deleteMacro } from '@/app/actions/macro';
+import { addMacro, deleteMacro, updateMacro } from '@/app/actions/macro';
 import {
   MACRO_EXPENSE_CATEGORIES,
   MACRO_INCOME_CATEGORIES,
@@ -30,14 +30,27 @@ type Props = {
 
 const PRESETS = [100, 500, 1000, 5000];
 
+function presetLabel(v: number): string {
+  return v >= 1000 ? `${v / 1000}k` : String(v);
+}
+
+function parseAmount(input: string): number {
+  const n = parseFloat(input);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props) {
   const router = useRouter();
   const [type, setType] = useState<MacroType>('INCOME');
-  const [amount, setAmount] = useState<number>(0);
+  const [amountInput, setAmountInput] = useState<string>('');
   const [category, setCategory] = useState<string>(MACRO_INCOME_CATEGORIES[0]);
   const [note, setNote] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const amount = parseAmount(amountInput);
+  const editing = editingId !== null;
 
   const categoryList = useMemo(
     () => (type === 'INCOME' ? MACRO_INCOME_CATEGORIES : MACRO_EXPENSE_CATEGORIES),
@@ -46,31 +59,49 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
 
   function selectType(t: MacroType) {
     setType(t);
-    const first = t === 'INCOME' ? MACRO_INCOME_CATEGORIES[0] : MACRO_EXPENSE_CATEGORIES[0];
-    setCategory(first);
+    const list = t === 'INCOME' ? MACRO_INCOME_CATEGORIES : MACRO_EXPENSE_CATEGORIES;
+    if (!(list as readonly string[]).includes(category)) {
+      setCategory(list[0]);
+    }
   }
 
-  function addPreset(v: number) {
-    setAmount(a => Math.round((a + v) * 10) / 10);
+  function adjustAmount(delta: number) {
+    const next = Math.max(0, Math.round((amount + delta) * 10) / 10);
+    setAmountInput(next === 0 ? '' : String(next));
     setError(null);
   }
 
-  function clearAmount() {
-    setAmount(0);
+  function clearForm() {
+    setEditingId(null);
+    setAmountInput('');
+    setNote('');
+    setError(null);
+  }
+
+  function startEdit(it: MacroItem) {
+    const t = it.type as MacroType;
+    setEditingId(it.id);
+    setType(t);
+    setCategory(it.category);
+    setAmountInput(String(it.amountRMB));
+    setNote(it.note ?? '');
     setError(null);
   }
 
   function submit() {
     setError(null);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (amount <= 0) {
       setError('enter amount');
       return;
     }
     startTransition(async () => {
       try {
-        await addMacro({ type, amountRMB: amount, category, note });
-        setAmount(0);
-        setNote('');
+        if (editingId) {
+          await updateMacro({ id: editingId, type, amountRMB: amount, category, note });
+        } else {
+          await addMacro({ type, amountRMB: amount, category, note });
+        }
+        clearForm();
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'failed');
@@ -81,6 +112,7 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
   function remove(id: string) {
     startTransition(async () => {
       try {
+        if (editingId === id) clearForm();
         await deleteMacro(id);
         router.refresh();
       } catch {}
@@ -113,7 +145,7 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
         </div>
       </div>
 
-      {/* Entries list (scrollable middle section) */}
+      {/* Entries list */}
       <div className="flex-1 overflow-y-auto">
         {items.length === 0 ? (
           <div className="px-5 py-6 text-center text-[11px] font-mono text-[#444]">
@@ -124,10 +156,15 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
             const itemIncome = it.type === 'INCOME';
             const color = itemIncome ? '#e8ff47' : '#ff4747';
             const sign = itemIncome ? '+' : '−';
+            const isEditingThis = editingId === it.id;
             return (
               <div
                 key={it.id}
-                className="px-5 py-2.5 flex items-center justify-between border-b hairline"
+                onClick={() => startEdit(it)}
+                className={cn(
+                  'px-5 py-2.5 flex items-center justify-between border-b hairline cursor-pointer active:bg-[#0f0f0f]',
+                  isEditingThis && 'bg-[#101010]',
+                )}
               >
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-2">
@@ -143,6 +180,14 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
                     <span className="font-sans text-[13px] text-white truncate">
                       {it.note || '—'}
                     </span>
+                    {isEditingThis && (
+                      <span
+                        className="font-mono text-[8px] tracking-[1px] px-1.5 py-0.5 rounded-sm"
+                        style={{ background: '#222', color: accentColor }}
+                      >
+                        EDIT
+                      </span>
+                    )}
                   </div>
                   <span className="font-mono text-[9px] text-[#444] mt-0.5">{it.date}</span>
                 </div>
@@ -154,9 +199,12 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
                     {sign}{formatRMB(it.amountRMB)}
                   </span>
                   <button
-                    onClick={() => remove(it.id)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      remove(it.id);
+                    }}
                     disabled={pending}
-                    className="font-mono text-[10px] text-[#555] hover:text-danger"
+                    className="font-mono text-[10px] text-[#555] hover:text-danger px-1"
                   >
                     ✕
                   </button>
@@ -169,12 +217,33 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
 
       {/* Bottom thumb-zone form */}
       <div className="shrink-0 border-t hairline" style={{ background: '#0a0a0a' }}>
+        {/* Edit banner */}
+        {editing && (
+          <div
+            className="px-3 py-2 flex items-center justify-between border-b-[0.5px]"
+            style={{ background: '#101010', borderColor: '#1a1a1a' }}
+          >
+            <span
+              className="font-mono text-[10px] tracking-[2px]"
+              style={{ color: accentColor }}
+            >
+              EDITING ENTRY
+            </span>
+            <button
+              onClick={clearForm}
+              className="font-mono text-[10px] tracking-[2px] text-[#888] active:text-[#fff]"
+            >
+              CANCEL
+            </button>
+          </div>
+        )}
+
         {/* Type toggle */}
         <div className="px-3 pt-3 flex gap-2">
           <button
             onClick={() => selectType('INCOME')}
             className={cn(
-              'flex-1 h-10 rounded font-mono text-[11px] tracking-[2px] border-[0.5px] transition-colors',
+              'flex-1 h-10 rounded font-mono text-[11px] tracking-[2px] border-[0.5px]',
               isIncome
                 ? 'bg-accent text-[#080808] border-accent'
                 : 'bg-[#111] text-[#888] border-[#222]',
@@ -185,7 +254,7 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
           <button
             onClick={() => selectType('EXPENSE')}
             className={cn(
-              'flex-1 h-10 rounded font-mono text-[11px] tracking-[2px] border-[0.5px] transition-colors',
+              'flex-1 h-10 rounded font-mono text-[11px] tracking-[2px] border-[0.5px]',
               !isIncome
                 ? 'bg-[#ff4747] text-[#080808] border-[#ff4747]'
                 : 'bg-[#111] text-[#888] border-[#222]',
@@ -195,43 +264,77 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
           </button>
         </div>
 
-        {/* Hero amount display */}
-        <div className="px-3 pt-3 flex items-end justify-between">
-          <div className="flex flex-col min-w-0">
-            <div className="font-mono text-[9px] tracking-[2px] text-[#444]">AMOUNT (RMB)</div>
-            <div
-              className="font-display text-[40px] leading-none tabular-nums truncate"
+        {/* Amount section: typeable hero input */}
+        <div className="px-3 pt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-[9px] tracking-[2px] text-[#444]">AMOUNT (RMB)</span>
+            <button
+              onClick={() => {
+                setAmountInput('');
+                setError(null);
+              }}
+              disabled={amount === 0}
+              className="font-mono text-[10px] tracking-[2px] text-[#555] disabled:opacity-30 px-2"
+            >
+              CLEAR
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="font-display text-[36px] leading-none"
               style={{ color: amount > 0 ? accentColor : '#333' }}
             >
-              ¥{formatRMB(amount)}
-            </div>
-            <div className="font-mono text-[10px] text-[#444] mt-1">
-              ≈ {formatIDR(idrPreview)}
-            </div>
+              ¥
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amountInput}
+              onChange={e => {
+                const cleaned = e.target.value.replace(/[^\d.]/g, '');
+                const parts = cleaned.split('.');
+                const safe = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+                setAmountInput(safe);
+                setError(null);
+              }}
+              placeholder="0"
+              className="flex-1 min-w-0 bg-transparent border-none outline-none font-display text-[36px] leading-none tabular-nums placeholder:text-[#333]"
+              style={{ color: amount > 0 ? accentColor : '#F0F0F0' }}
+            />
           </div>
-          <button
-            onClick={clearAmount}
-            disabled={amount === 0}
-            className="font-mono text-[10px] tracking-[2px] text-[#555] disabled:opacity-30 px-2 py-1"
-          >
-            CLEAR
-          </button>
+          <div className="font-mono text-[10px] text-[#444] mt-1">
+            ≈ {formatIDR(idrPreview)}
+          </div>
         </div>
 
-        {/* Quick add presets */}
+        {/* Add row */}
         <div className="px-3 pt-3 grid grid-cols-4 gap-2">
           {PRESETS.map(v => (
             <button
-              key={v}
-              onClick={() => addPreset(v)}
-              className="h-10 rounded bg-[#111] border-[0.5px] border-[#222] font-display text-[14px] text-[#F0F0F0] active:bg-[#1a1a1a]"
+              key={`add-${v}`}
+              onClick={() => adjustAmount(v)}
+              className="h-9 rounded bg-[#111] border-[0.5px] border-[#222] font-display text-[13px] text-[#F0F0F0] active:bg-[#1a1a1a]"
             >
-              +{v >= 1000 ? `${v / 1000}k` : v}
+              +{presetLabel(v)}
             </button>
           ))}
         </div>
 
-        {/* Category grid (all visible at once, no wrapping) */}
+        {/* Subtract row */}
+        <div className="px-3 pt-2 grid grid-cols-4 gap-2">
+          {PRESETS.map(v => (
+            <button
+              key={`sub-${v}`}
+              onClick={() => adjustAmount(-v)}
+              disabled={amount === 0}
+              className="h-9 rounded bg-[#0a0a0a] border-[0.5px] border-[#1a1a1a] font-display text-[13px] text-[#777] active:bg-[#151515] disabled:opacity-30"
+            >
+              −{presetLabel(v)}
+            </button>
+          ))}
+        </div>
+
+        {/* Categories */}
         <div className="px-3 pt-3 grid grid-cols-4 gap-2">
           {categoryList.map(c => (
             <button
@@ -251,7 +354,7 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
           ))}
         </div>
 
-        {/* Note input (compact, optional) */}
+        {/* Note */}
         <div className="px-3 pt-3">
           <input
             type="text"
@@ -266,16 +369,20 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
           <div className="px-3 pt-2 text-[11px] text-danger font-mono text-center">{error}</div>
         )}
 
-        {/* ADD button — pinned to bottom of form (closest to thumb) */}
+        {/* Submit */}
         <button
           onClick={submit}
           disabled={pending}
           className={cn(
-            'h-12 w-full font-display text-sm tracking-wider mt-3 disabled:opacity-60 transition-colors',
+            'h-12 w-full font-display text-sm tracking-wider mt-3 disabled:opacity-60',
             isIncome ? 'bg-accent text-[#080808]' : 'bg-[#ff4747] text-[#080808]',
           )}
         >
-          {pending ? 'SAVING…' : `+ ADD ${type} · ¥${formatRMB(amount)}`}
+          {pending
+            ? 'SAVING…'
+            : editing
+              ? `SAVE · ¥${formatRMB(amount)}`
+              : `+ ADD ${type} · ¥${formatRMB(amount)}`}
         </button>
       </div>
     </div>
