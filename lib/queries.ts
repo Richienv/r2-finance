@@ -58,3 +58,50 @@ export async function getBankBalance() {
     dailyExpenseRMB,
   };
 }
+
+export type TopPurchase = {
+  id: string;
+  label: string;
+  category: string;
+  amountRMB: number;
+  date: string;
+  source: 'DAILY' | 'MACRO';
+};
+
+export async function getTopPurchases(limit = 3): Promise<TopPurchase[]> {
+  const [topExpenses, topMacro] = await Promise.all([
+    prisma.expense.findMany({
+      orderBy: { amountRMB: 'desc' },
+      take: limit,
+      select: { id: true, note: true, category: true, amountRMB: true, date: true },
+    }),
+    prisma.macro.findMany({
+      where: { type: 'EXPENSE' },
+      orderBy: { amountRMB: 'desc' },
+      take: limit,
+      select: { id: true, note: true, category: true, amountRMB: true, date: true },
+    }),
+  ]);
+
+  const merged: TopPurchase[] = [
+    ...topExpenses.map(e => ({
+      id: `e:${e.id}`,
+      label: e.note?.trim() || e.category,
+      category: e.category,
+      amountRMB: e.amountRMB,
+      date: e.date,
+      source: 'DAILY' as const,
+    })),
+    ...topMacro.map(m => ({
+      id: `m:${m.id}`,
+      label: m.note?.trim() || m.category,
+      category: m.category,
+      amountRMB: m.amountRMB,
+      date: m.date,
+      source: 'MACRO' as const,
+    })),
+  ];
+
+  merged.sort((a, b) => b.amountRMB - a.amountRMB);
+  return merged.slice(0, limit);
+}

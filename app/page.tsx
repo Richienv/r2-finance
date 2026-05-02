@@ -3,7 +3,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { StatRing } from '@/components/StatRing';
 import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
-import { getBankBalance, getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
+import { getBankBalance, getMonthExpenses, getTopPurchases, getWeekExpenses, sumRMB } from '@/lib/queries';
 import {
   VARIABLE_BUDGET,
   IDR_PER_RMB,
@@ -45,21 +45,16 @@ function formatParts(d: Date) {
   return { date, time, monthYear };
 }
 
-function headline(dayLeft: number): string {
-  if (dayLeft < 0) return 'TOMORROW RESETS.';
-  if (dayLeft === 0) return 'ON TRACK.';
-  return 'GOOD PACE.';
-}
-
 export default async function HomePage() {
   const month = currentMonthKey();
   const today = cstDateString();
 
-  const [monthRows, week, todayBudget, bank] = await Promise.all([
+  const [monthRows, week, todayBudget, bank, topPurchases] = await Promise.all([
     getMonthExpenses(month),
     getWeekExpenses(),
     ensureDailyBudget(today),
     getBankBalance(),
+    getTopPurchases(3),
   ]);
 
   const spentFree = sumRMB(monthRows, { excludeFixed: true });
@@ -128,18 +123,34 @@ export default async function HomePage() {
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div
-          className="font-display text-[32px] tracking-[2px] text-center"
-          style={{
-            backgroundImage:
-              'linear-gradient(180deg, #f6ffa0 0%, #e8ff47 45%, #b8cc30 100%)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          {headline(dayLeft)}
+        <div className="w-[280px] flex flex-col items-stretch">
+          <div className="font-mono text-[9px] tracking-[2px] text-[#555] text-center mb-2">
+            TOP 3 PURCHASES
+          </div>
+          {topPurchases.length === 0 ? (
+            <div className="font-mono text-[11px] text-[#444] text-center">— none yet —</div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {topPurchases.map((p, i) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 font-mono text-[12px]"
+                >
+                  <span className="text-[#444] tabular-nums shrink-0 w-4">#{i + 1}</span>
+                  <span className="text-[#bbb] truncate flex-1 min-w-0">{p.label}</span>
+                  <span className="font-mono text-[8px] tracking-[1px] text-[#444] shrink-0">
+                    {p.source === 'MACRO' ? 'MACRO' : p.category}
+                  </span>
+                  <span
+                    className="tabular-nums shrink-0 text-right"
+                    style={{ color: '#ff6666' }}
+                  >
+                    ¥{formatRMB(p.amountRMB)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-8 flex items-start justify-center gap-6">
