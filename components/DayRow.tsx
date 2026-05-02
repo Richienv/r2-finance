@@ -72,6 +72,9 @@ function ExpenseRow({ expense }: { expense: Expense }) {
     startX.current = e.clientX;
     movedRef.current = false;
     setDragging(true);
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {}
   }
   function onPointerMove(e: React.PointerEvent) {
     if (startX.current == null) return;
@@ -79,10 +82,13 @@ function ExpenseRow({ expense }: { expense: Expense }) {
     if (Math.abs(d) > 3) movedRef.current = true;
     if (d < 0) setDx(Math.max(-96, d));
   }
-  function onPointerUp() {
+  function onPointerUp(e: React.PointerEvent) {
     if (startX.current == null) return;
     startX.current = null;
     setDragging(false);
+    try {
+      (e.currentTarget as Element).releasePointerCapture(e.pointerId);
+    } catch {}
     if (dx <= -60) {
       setDx(-80);
       setConfirming(true);
@@ -149,6 +155,13 @@ function ExpenseRow({ expense }: { expense: Expense }) {
           className="font-mono text-[10px] tracking-wider text-[#080808] bg-accent px-2 py-1 rounded"
         >
           {pending ? '…' : 'SAVE'}
+        </button>
+        <button
+          onClick={doDelete}
+          disabled={pending}
+          className="font-mono text-[10px] tracking-wider text-white bg-danger px-2 py-1 rounded"
+        >
+          {pending ? '…' : 'DEL'}
         </button>
         <button
           onClick={() => setEditing(false)}

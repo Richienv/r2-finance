@@ -7,7 +7,7 @@ import { CATEGORIES, CATEGORY_META, IDR_PER_RMB, type Category } from '@/lib/con
 import { formatIDR, rmbToIdr } from '@/lib/money';
 import { cn } from '@/lib/cn';
 
-const PRESETS = [18, 20, 25, 30, 50];
+const PRESETS = [10, 50, 100, 200, 500, 1000];
 const MIN_AMOUNT = 0.5;
 
 function vibrate(pattern: number | number[]) {
@@ -31,7 +31,7 @@ export function AddExpenseForm() {
     rawCat && (CATEGORIES as readonly string[]).includes(rawCat) ? rawCat : 'FOOD';
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [amount, setAmount] = useState<number>(0);
+  const [amountInput, setAmountInput] = useState<string>('');
   const category: Category = initialCat;
   const [note, setNote] = useState('');
   const [noteShake, setNoteShake] = useState(false);
@@ -40,17 +40,34 @@ export function AddExpenseForm() {
   const [flash, setFlash] = useState(false);
   const noteRef = useRef<HTMLInputElement | null>(null);
 
+  const amount = (() => {
+    const n = parseFloat(amountInput);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  })();
   const idrPreview = amount > 0 ? rmbToIdr(amount, IDR_PER_RMB) : 0;
   const canNext = amount >= MIN_AMOUNT;
 
+  function formatAmount(n: number): string {
+    if (n === 0) return '';
+    return n % 1 === 0 ? String(n) : n.toFixed(1);
+  }
+
   function bump(delta: number) {
-    setAmount(a => Math.max(0, Math.round((a + delta) * 10) / 10));
+    const next = Math.max(0, Math.round((amount + delta) * 10) / 10);
+    setAmountInput(formatAmount(next));
     vibrate(10);
   }
 
   function setPreset(v: number) {
-    setAmount(v);
+    setAmountInput(String(v));
     vibrate(15);
+  }
+
+  function handleAmountChange(raw: string) {
+    const cleaned = raw.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    const safe = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+    setAmountInput(safe);
   }
 
   function goNext() {
@@ -118,14 +135,22 @@ export function AddExpenseForm() {
           {/* hero amount */}
           <div className="flex-1 flex flex-col items-center justify-center px-4">
             <div className="font-mono text-[9px] tracking-[2px] text-[#444] mb-2">AMOUNT (RMB)</div>
-            <div className="font-display text-[72px] leading-none text-[#F0F0F0] tabular-nums">
-              ¥ {amount % 1 === 0 ? amount : amount.toFixed(1)}
-            </div>
+            <label className="flex items-baseline justify-center cursor-text">
+              <span className="font-display text-[72px] leading-none text-[#F0F0F0]">¥</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={amountInput}
+                onChange={e => handleAmountChange(e.target.value)}
+                placeholder="0"
+                className="ml-2 w-56 bg-transparent border-none outline-none font-display text-[72px] leading-none tabular-nums text-[#F0F0F0] placeholder:text-[#222]"
+              />
+            </label>
             <div className="mt-3 font-mono text-[13px] text-[#444]">≈ {formatIDR(idrPreview)}</div>
           </div>
 
           {/* presets */}
-          <div className="px-4 flex justify-center gap-2 mb-2">
+          <div className="px-4 grid grid-cols-6 gap-1.5 mb-2">
             {PRESETS.map(v => {
               const active = amount === v;
               return (
@@ -133,13 +158,13 @@ export function AddExpenseForm() {
                   key={v}
                   onClick={() => setPreset(v)}
                   className={cn(
-                    'h-8 w-12 rounded-full font-display text-sm border-[0.5px]',
+                    'h-9 rounded-full font-display text-[13px] border-[0.5px] tabular-nums',
                     active
                       ? 'bg-accent text-[#080808] border-accent'
                       : 'bg-[#111] text-[#F0F0F0] border-[#222]',
                   )}
                 >
-                  {v}
+                  {v >= 1000 ? `${v / 1000}k` : v}
                 </button>
               );
             })}
