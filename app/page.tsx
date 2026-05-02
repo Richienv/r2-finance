@@ -3,6 +3,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { StatRing } from '@/components/StatRing';
 import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
+import { TopPurchases } from '@/components/TopPurchases';
 import { getBankBalance, getMonthExpenses, getTopPurchases, getWeekExpenses, sumRMB } from '@/lib/queries';
 import {
   VARIABLE_BUDGET,
@@ -122,38 +123,10 @@ export default async function HomePage() {
       {isMonthResetDay && <MonthResetBanner />}
 
       {/* MAIN */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div className="w-[280px] flex flex-col items-stretch">
-          <div className="font-mono text-[9px] tracking-[2px] text-[#555] text-center mb-2">
-            TOP 3 PURCHASES
-          </div>
-          {topPurchases.length === 0 ? (
-            <div className="font-mono text-[11px] text-[#444] text-center">— none yet —</div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {topPurchases.map((p, i) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 font-mono text-[12px]"
-                >
-                  <span className="text-[#444] tabular-nums shrink-0 w-4">#{i + 1}</span>
-                  <span className="text-[#bbb] truncate flex-1 min-w-0">{p.label}</span>
-                  <span className="font-mono text-[8px] tracking-[1px] text-[#444] shrink-0">
-                    {p.source === 'MACRO' ? 'MACRO' : p.category}
-                  </span>
-                  <span
-                    className="tabular-nums shrink-0 text-right"
-                    style={{ color: '#ff6666' }}
-                  >
-                    ¥{formatRMB(p.amountRMB)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 gap-10">
+        <TopPurchases items={topPurchases} />
 
-        <div className="mt-8 flex items-start justify-center gap-6">
+        <div className="flex items-start justify-center gap-6">
           <StatRing
             value={dayOver ? `−${formatRMB(Math.abs(dayLeft))}` : formatRMB(dayLeft)}
             unit={dayOver ? 'RMB OVER' : 'RMB LEFT'}
@@ -189,28 +162,26 @@ export default async function HomePage() {
           />
         </div>
 
-        {/* Bank balance: total cash position from macro income minus
-            macro expenses and all daily expenses */}
-        <div className="mt-8 flex flex-col items-center">
+        {/* Bank: total cash position = macro income − macro expenses − daily expenses */}
+        <div className="flex flex-col items-center gap-1">
           <span className="font-mono text-[9px] tracking-[2px] text-[#555]">BANK</span>
           <span
-            className="font-display text-[28px] leading-tight tabular-nums mt-0.5"
+            className="font-display text-[28px] leading-tight tabular-nums"
             style={{ color: bank.balanceRMB < 0 ? '#ff4747' : '#e8ff47' }}
           >
             {bank.balanceRMB < 0 ? '−' : ''}¥{formatRMB(Math.abs(bank.balanceRMB))}
           </span>
-          <span className="font-mono text-[10px] text-[#555] mt-0.5 tabular-nums">
+          <span className="font-mono text-[10px] text-[#555] tabular-nums">
             ≈ {bank.balanceRMB < 0 ? '−' : ''}{formatIDR(rmbToIdr(Math.abs(bank.balanceRMB), IDR_PER_RMB))}
           </span>
-          <span className="font-mono text-[9px] tracking-[1px] text-[#444] mt-1.5 tabular-nums">
+          <span className="font-mono text-[9px] tracking-[1px] tabular-nums mt-1">
             <span style={{ color: '#a8b840' }}>+¥{formatRMB(bank.incomeRMB)} IN</span>
-            <span className="mx-2">·</span>
+            <span className="text-[#333] mx-2">·</span>
             <span style={{ color: '#cc4444' }}>−¥{formatRMB(bank.expenseRMB)} OUT</span>
           </span>
-        </div>
-
-        <div className="mt-4 font-mono text-[9px] tracking-[1.5px] text-[#444] text-center">
-          {formatIDR(idr)} · FREE POOL
+          <span className="mt-3 font-mono text-[9px] tracking-[1.5px] text-[#3a3a3a] text-center">
+            {formatIDR(idr)} · FREE POOL
+          </span>
         </div>
       </div>
 
