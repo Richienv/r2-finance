@@ -3,7 +3,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { StatRing } from '@/components/StatRing';
 import { MonthResetBanner } from '@/components/MonthResetBanner';
 import { QuickAddRow } from '@/components/QuickAddRow';
-import { getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
+import { getBankBalance, getMonthExpenses, getWeekExpenses, sumRMB } from '@/lib/queries';
 import {
   VARIABLE_BUDGET,
   IDR_PER_RMB,
@@ -55,10 +55,11 @@ export default async function HomePage() {
   const month = currentMonthKey();
   const today = cstDateString();
 
-  const [monthRows, week, todayBudget] = await Promise.all([
+  const [monthRows, week, todayBudget, bank] = await Promise.all([
     getMonthExpenses(month),
     getWeekExpenses(),
     ensureDailyBudget(today),
+    getBankBalance(),
   ]);
 
   const spentFree = sumRMB(monthRows, { excludeFixed: true });
@@ -177,7 +178,27 @@ export default async function HomePage() {
           />
         </div>
 
-        <div className="mt-6 font-mono text-[9px] tracking-[1.5px] text-[#555] text-center">
+        {/* Bank balance: total cash position from macro income minus
+            macro expenses and all daily expenses */}
+        <div className="mt-8 flex flex-col items-center">
+          <span className="font-mono text-[9px] tracking-[2px] text-[#555]">BANK</span>
+          <span
+            className="font-display text-[28px] leading-tight tabular-nums mt-0.5"
+            style={{ color: bank.balanceRMB < 0 ? '#ff4747' : '#e8ff47' }}
+          >
+            {bank.balanceRMB < 0 ? '−' : ''}¥{formatRMB(Math.abs(bank.balanceRMB))}
+          </span>
+          <span className="font-mono text-[10px] text-[#555] mt-0.5 tabular-nums">
+            ≈ {bank.balanceRMB < 0 ? '−' : ''}{formatIDR(rmbToIdr(Math.abs(bank.balanceRMB), IDR_PER_RMB))}
+          </span>
+          <span className="font-mono text-[9px] tracking-[1px] text-[#444] mt-1.5 tabular-nums">
+            <span style={{ color: '#a8b840' }}>+¥{formatRMB(bank.incomeRMB)} IN</span>
+            <span className="mx-2">·</span>
+            <span style={{ color: '#cc4444' }}>−¥{formatRMB(bank.expenseRMB)} OUT</span>
+          </span>
+        </div>
+
+        <div className="mt-4 font-mono text-[9px] tracking-[1.5px] text-[#444] text-center">
           {formatIDR(idr)} · FREE POOL
         </div>
       </div>
