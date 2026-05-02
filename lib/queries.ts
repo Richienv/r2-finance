@@ -29,3 +29,32 @@ export function sumRMB(rows: { amountRMB: number; category: string }[], opts?: {
     .filter(r => !opts?.excludeFixed || r.category !== 'FIXED')
     .reduce((s, r) => s + r.amountRMB, 0);
 }
+
+export async function getBankBalance() {
+  const [macroIncome, macroExpense, dailyExpense] = await Promise.all([
+    prisma.macro.aggregate({
+      _sum: { amountRMB: true },
+      where: { type: 'INCOME' },
+    }),
+    prisma.macro.aggregate({
+      _sum: { amountRMB: true },
+      where: { type: 'EXPENSE' },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amountRMB: true },
+    }),
+  ]);
+
+  const incomeRMB = macroIncome._sum.amountRMB ?? 0;
+  const macroExpenseRMB = macroExpense._sum.amountRMB ?? 0;
+  const dailyExpenseRMB = dailyExpense._sum.amountRMB ?? 0;
+  const expenseRMB = macroExpenseRMB + dailyExpenseRMB;
+
+  return {
+    balanceRMB: incomeRMB - expenseRMB,
+    incomeRMB,
+    expenseRMB,
+    macroExpenseRMB,
+    dailyExpenseRMB,
+  };
+}
