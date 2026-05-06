@@ -9,6 +9,7 @@ import {
   type MacroType,
 } from '@/lib/macro';
 import { IDR_PER_RMB } from '@/lib/constants';
+import { cstDateString, currentMonthKey, weekRange } from '@/lib/date';
 import { formatIDR, formatRMB, rmbToIdr } from '@/lib/money';
 import { cn } from '@/lib/cn';
 
@@ -126,6 +127,41 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
   const accentColor = isIncome ? '#e8ff47' : '#ff4747';
   const idrPreview = amount > 0 ? rmbToIdr(amount, IDR_PER_RMB) : 0;
 
+  // Stats by time period (computed from items)
+  const stats = useMemo(() => {
+    const today = cstDateString();
+    const monthKey = currentMonthKey();
+    const wk = weekRange();
+    const init = () => ({ income: 0, expense: 0 });
+    const out = { today: init(), week: init(), month: init() };
+    for (const it of items) {
+      const isInc = it.type === 'INCOME';
+      const a = it.amountRMB;
+      if (it.date === today) (isInc ? (out.today.income += a) : (out.today.expense += a));
+      if (it.date >= wk.start && it.date <= wk.end)
+        (isInc ? (out.week.income += a) : (out.week.expense += a));
+      if (it.date.startsWith(monthKey))
+        (isInc ? (out.month.income += a) : (out.month.expense += a));
+    }
+    return out;
+  }, [items]);
+
+  // Group entries by date for a calendar-style list
+  const todayDate = useMemo(() => cstDateString(), []);
+  const groupedItems = useMemo(() => {
+    const groups: { date: string; items: MacroItem[]; netRMB: number }[] = [];
+    let current: (typeof groups)[number] | null = null;
+    for (const it of items) {
+      if (!current || current.date !== it.date) {
+        current = { date: it.date, items: [], netRMB: 0 };
+        groups.push(current);
+      }
+      current.items.push(it);
+      current.netRMB += it.type === 'INCOME' ? it.amountRMB : -it.amountRMB;
+    }
+    return groups;
+  }, [items]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Compact balance strip */}
@@ -145,73 +181,98 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
         </div>
       </div>
 
-      {/* Entries list */}
+      {/* Stats strip — net flow per period */}
+      <div className="grid grid-cols-3 border-b hairline">
+        <PeriodCell label="TODAY" income={stats.today.income} expense={stats.today.expense} />
+        <PeriodCell label="WEEK" income={stats.week.income} expense={stats.week.expense} />
+        <PeriodCell label="MONTH" income={stats.month.income} expense={stats.month.expense} />
+      </div>
+
+      {/* Entries list — grouped by date with daily totals */}
       <div className="flex-1 overflow-y-auto">
-        {items.length === 0 ? (
+        {groupedItems.length === 0 ? (
           <div className="px-5 py-6 text-center text-[11px] font-mono text-[#444]">
             — log your first macro below —
           </div>
         ) : (
-          items.map(it => {
-            const itemIncome = it.type === 'INCOME';
-            const color = itemIncome ? '#e8ff47' : '#ff4747';
-            const sign = itemIncome ? '+' : '−';
-            const isEditingThis = editingId === it.id;
-            return (
+          groupedItems.map(group => (
+            <div key={group.date}>
               <div
-                key={it.id}
-                onClick={() => startEdit(it)}
-                className={cn(
-                  'px-5 py-2.5 flex items-center justify-between border-b hairline cursor-pointer active:bg-[#0f0f0f]',
-                  isEditingThis && 'bg-[#101010]',
-                )}
+                className="px-5 py-1.5 flex items-center justify-between sticky top-0 z-10"
+                style={{ background: '#0a0a0a' }}
               >
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="font-mono text-[9px] tracking-[1px] uppercase"
-                      style={{ color }}
-                    >
-                      {it.type}
-                    </span>
-                    <span className="font-mono text-[9px] tracking-[1px] uppercase text-[#666]">
-                      {it.category}
-                    </span>
-                    <span className="font-sans text-[13px] text-white truncate">
-                      {it.note || '—'}
-                    </span>
-                    {isEditingThis && (
-                      <span
-                        className="font-mono text-[8px] tracking-[1px] px-1.5 py-0.5 rounded-sm"
-                        style={{ background: '#222', color: accentColor }}
-                      >
-                        EDIT
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-mono text-[9px] text-[#444] mt-0.5">{it.date}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className="font-mono text-[13px] tabular-nums"
-                    style={{ color }}
-                  >
-                    {sign}{formatRMB(it.amountRMB)}
-                  </span>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      remove(it.id);
-                    }}
-                    disabled={pending}
-                    className="font-mono text-[10px] text-[#555] hover:text-danger px-1"
-                  >
-                    ✕
-                  </button>
-                </div>
+                <span className="font-mono text-[9px] tracking-[2px] text-[#666]">
+                  {formatDateHeader(group.date, todayDate)}
+                </span>
+                <span
+                  className="font-mono text-[9px] tabular-nums"
+                  style={{ color: group.netRMB === 0 ? '#444' : group.netRMB > 0 ? '#a8b840' : '#cc4444' }}
+                >
+                  {group.netRMB > 0 ? '+' : group.netRMB < 0 ? '−' : ''}
+                  ¥{formatRMB(Math.abs(group.netRMB))}
+                </span>
               </div>
-            );
-          })
+              {group.items.map(it => {
+                const itemIncome = it.type === 'INCOME';
+                const color = itemIncome ? '#e8ff47' : '#ff4747';
+                const sign = itemIncome ? '+' : '−';
+                const isEditingThis = editingId === it.id;
+                return (
+                  <div
+                    key={it.id}
+                    onClick={() => startEdit(it)}
+                    className={cn(
+                      'px-5 py-2.5 flex items-center justify-between border-b hairline cursor-pointer active:bg-[#0f0f0f]',
+                      isEditingThis && 'bg-[#101010]',
+                    )}
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="font-mono text-[9px] tracking-[1px] uppercase"
+                          style={{ color }}
+                        >
+                          {it.type}
+                        </span>
+                        <span className="font-mono text-[9px] tracking-[1px] uppercase text-[#666]">
+                          {it.category}
+                        </span>
+                        <span className="font-sans text-[13px] text-white truncate">
+                          {it.note || '—'}
+                        </span>
+                        {isEditingThis && (
+                          <span
+                            className="font-mono text-[8px] tracking-[1px] px-1.5 py-0.5 rounded-sm"
+                            style={{ background: '#222', color: accentColor }}
+                          >
+                            EDIT
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="font-mono text-[13px] tabular-nums"
+                        style={{ color }}
+                      >
+                        {sign}{formatRMB(it.amountRMB)}
+                      </span>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          remove(it.id);
+                        }}
+                        disabled={pending}
+                        className="font-mono text-[10px] text-[#555] hover:text-danger px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
         )}
       </div>
 
@@ -387,4 +448,46 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
       </div>
     </div>
   );
+}
+
+function PeriodCell({
+  label,
+  income,
+  expense,
+}: {
+  label: string;
+  income: number;
+  expense: number;
+}) {
+  const net = income - expense;
+  const netColor = net === 0 ? '#444' : net > 0 ? '#a8b840' : '#cc4444';
+  const netSign = net > 0 ? '+' : net < 0 ? '−' : '';
+  return (
+    <div className="px-3 py-2 flex flex-col items-center border-r-[0.5px] border-[#1a1a1a] last:border-r-0">
+      <span className="font-mono text-[8px] tracking-[2px] text-[#555]">{label}</span>
+      <span className="font-mono text-[14px] tabular-nums mt-0.5" style={{ color: netColor }}>
+        {netSign}¥{formatRMBCompact(Math.abs(net))}
+      </span>
+      <span className="font-mono text-[8px] tabular-nums mt-0.5">
+        <span style={{ color: '#7a8830' }}>+{formatRMBCompact(income)}</span>
+        <span className="text-[#333] mx-1">·</span>
+        <span style={{ color: '#aa3838' }}>−{formatRMBCompact(expense)}</span>
+      </span>
+    </div>
+  );
+}
+
+function formatRMBCompact(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(0)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return formatRMB(n);
+}
+
+const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+function formatDateHeader(date: string, today: string): string {
+  const [, mm, dd] = date.split('-').map(Number) as [number, number, number];
+  const label = `${MONTHS_SHORT[(mm ?? 1) - 1]} ${dd}`;
+  if (date === today) return `${label} · TODAY`;
+  return label;
 }
