@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { BottomNav } from '@/components/BottomNav';
 import { WeekChart } from '@/components/WeekChart';
@@ -15,10 +16,34 @@ function labelFor(date: string) {
   return `${wd}, ${['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][Number(m)-1]} ${Number(d)}`;
 }
 
-export default async function WeekPage() {
-  const { days, rows, start, end } = await getWeekExpenses();
+function weekLabelFor(offset: number): string {
+  if (offset === 0) return 'THIS WEEK';
+  if (offset === -1) return 'LAST WEEK';
+  if (offset === 1) return 'NEXT WEEK';
+  if (offset < 0) return `${Math.abs(offset)} WEEKS AGO`;
+  return `${offset} WEEKS AHEAD`;
+}
+
+export default async function WeekPage({
+  searchParams,
+}: {
+  searchParams: { w?: string };
+}) {
+  const offsetRaw = parseInt(searchParams.w ?? '0', 10);
+  const offset = Number.isFinite(offsetRaw) ? offsetRaw : 0;
+
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + offset * 7);
+
   const today = cstDateString();
-  const monthRows = await getMonthExpenses(currentMonthKey());
+  const { days, rows, start, end } = await getWeekExpenses(targetDate);
+
+  const isCurrentWeek = offset === 0;
+  const isPastWeek = offset < 0;
+  const isFutureWeek = offset > 0;
+
+  // Month-projection block only makes sense for the current week
+  const monthRows = isCurrentWeek ? await getMonthExpenses(currentMonthKey()) : [];
   const monthSpent = sumRMB(monthRows, { excludeFixed: true });
 
   const totalsByDay: Record<string, number> = Object.fromEntries(days.map(d => [d, 0]));
@@ -29,30 +54,67 @@ export default async function WeekPage() {
     byDay[r.date].push(r);
   }
 
-  const weekTotal = Object.values(totalsByDay).reduce((a,b) => a+b, 0);
+  const weekTotal = Object.values(totalsByDay).reduce((a, b) => a + b, 0);
   const avg = Math.round(weekTotal / 7);
-  const headerLabel = `${start.slice(5).replace('-','/')}–${end.slice(5).replace('-','/')}`;
+  const headerLabel = `${start.slice(5).replace('-', '/')}–${end.slice(5).replace('-', '/')}`;
 
-  // Expectations
-  const daysElapsedInWeek = Math.min(7, days.filter(d => d <= today).length);
+  // Days elapsed: full 7 for past, partial for current, 0 for future
+  const daysElapsedInWeek = isPastWeek
+    ? 7
+    : isFutureWeek
+      ? 0
+      : Math.min(7, days.filter(d => d <= today).length);
   const expectedSoFar = DAILY_BUDGET * daysElapsedInWeek;
   const weekDelta = expectedSoFar - weekTotal; // positive = saved, negative = over
-  const weekProjected = daysElapsedInWeek > 0 ? Math.round((weekTotal / daysElapsedInWeek) * 7) : 0;
 
-  // Month projection
-  const [, mStr] = currentMonthKey().split('-');
+  // Projection only meaningful for current week
+  const weekProjected =
+    isCurrentWeek && daysElapsedInWeek > 0
+      ? Math.round((weekTotal / daysElapsedInWeek) * 7)
+      : weekTotal;
+
+  // Month projection (current week only)
   const [y, m] = currentMonthKey().split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const todayDay = Number(today.slice(8, 10));
-  const monthProjected = todayDay > 0 ? Math.round((monthSpent / todayDay) * daysInMonth) : 0;
+  const monthProjected =
+    isCurrentWeek && todayDay > 0 ? Math.round((monthSpent / todayDay) * daysInMonth) : 0;
   const monthProjectedDelta = MONTHLY_FREE - monthProjected;
-  void mStr;
+
+  const prevHref = `/week?w=${offset - 1}`;
+  const nextHref = `/week?w=${offset + 1}`;
+  const canGoForward = offset < 0;
 
   return (
     <AppShell>
-      <header className="h-[60px] shrink-0 flex items-center justify-between px-4 border-b hairline">
-        <span className="font-display text-xl tracking-wider">THIS WEEK</span>
-        <span className="font-mono text-[11px] text-muted">{headerLabel}</span>
+      <header className="h-[60px] shrink-0 flex items-center px-2 border-b hairline">
+        <Link
+          href={prevHref}
+          aria-label="Previous week"
+          className="w-10 h-10 flex items-center justify-center font-mono text-[16px] text-[#888] active:text-white"
+        >
+          ◀
+        </Link>
+        <div className="flex-1 flex flex-col items-center leading-tight">
+          <span className="font-display text-base tracking-wider">{weekLabelFor(offset)}</span>
+          <span className="font-mono text-[10px] text-muted mt-0.5">{headerLabel}</span>
+        </div>
+        {canGoForward ? (
+          <Link
+            href={nextHref}
+            aria-label="Next week"
+            className="w-10 h-10 flex items-center justify-center font-mono text-[16px] text-[#888] active:text-white"
+          >
+            ▶
+          </Link>
+        ) : (
+          <span
+            aria-disabled
+            className="w-10 h-10 flex items-center justify-center font-mono text-[16px] text-[#222]"
+          >
+            ▶
+          </span>
+        )}
       </header>
 
       <WeekChart days={days} totalsByDay={totalsByDay} today={today} />
@@ -77,21 +139,27 @@ export default async function WeekPage() {
         <span className={`text-right tabular-nums ${weekDelta >= 0 ? 'text-success' : 'text-danger'}`}>
           {weekDelta >= 0 ? '+' : '−'}{formatRMB(Math.abs(weekDelta))} RMB
         </span>
-        <span>PROJECTED WEEK</span>
-        <span className={`text-right tabular-nums ${weekProjected > WEEKLY_BUDGET ? 'text-danger' : 'text-success'}`}>
-          {formatRMB(weekProjected)} / {WEEKLY_BUDGET}
-        </span>
-        <span>PROJECTED MONTH</span>
-        <span className={`text-right tabular-nums ${monthProjected > MONTHLY_FREE ? 'text-danger' : 'text-success'}`}>
-          {formatRMB(monthProjected)} / {MONTHLY_FREE}
-        </span>
+        {isCurrentWeek && (
+          <>
+            <span>PROJECTED WEEK</span>
+            <span className={`text-right tabular-nums ${weekProjected > WEEKLY_BUDGET ? 'text-danger' : 'text-success'}`}>
+              {formatRMB(weekProjected)} / {WEEKLY_BUDGET}
+            </span>
+            <span>PROJECTED MONTH</span>
+            <span className={`text-right tabular-nums ${monthProjected > MONTHLY_FREE ? 'text-danger' : 'text-success'}`}>
+              {formatRMB(monthProjected)} / {MONTHLY_FREE}
+            </span>
+          </>
+        )}
         <span>AVG / DAY</span>
         <span className="text-right tabular-nums text-muted">{avg} RMB</span>
-        <span className="col-span-2 text-[9px] text-[#444] text-center pt-1">
-          {monthProjectedDelta >= 0
-            ? `ON TRACK TO SAVE ${formatRMB(monthProjectedDelta)} THIS MONTH`
-            : `PROJECTED OVER BY ${formatRMB(Math.abs(monthProjectedDelta))}`}
-        </span>
+        {isCurrentWeek && (
+          <span className="col-span-2 text-[9px] text-[#444] text-center pt-1">
+            {monthProjectedDelta >= 0
+              ? `ON TRACK TO SAVE ${formatRMB(monthProjectedDelta)} THIS MONTH`
+              : `PROJECTED OVER BY ${formatRMB(Math.abs(monthProjectedDelta))}`}
+          </span>
+        )}
       </div>
 
       <BottomNav />
