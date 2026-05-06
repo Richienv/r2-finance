@@ -137,11 +137,18 @@ export function MacroManager({ items, balanceRMB, incomeRMB, expenseRMB }: Props
     for (const it of items) {
       const isInc = it.type === 'INCOME';
       const a = it.amountRMB;
-      if (it.date === today) (isInc ? (out.today.income += a) : (out.today.expense += a));
-      if (it.date >= wk.start && it.date <= wk.end)
-        (isInc ? (out.week.income += a) : (out.week.expense += a));
-      if (it.date.startsWith(monthKey))
-        (isInc ? (out.month.income += a) : (out.month.expense += a));
+      if (it.date === today) {
+        if (isInc) out.today.income += a;
+        else out.today.expense += a;
+      }
+      if (it.date >= wk.start && it.date <= wk.end) {
+        if (isInc) out.week.income += a;
+        else out.week.expense += a;
+      }
+      if (it.date.startsWith(monthKey)) {
+        if (isInc) out.month.income += a;
+        else out.month.expense += a;
+      }
     }
     return out;
   }, [items]);
