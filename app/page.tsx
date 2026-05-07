@@ -71,13 +71,11 @@ export default async function HomePage() {
 
   // Week
   const weekBudget = WEEKLY_BUDGET;
-  const weekLeft = weekBudget - weekSpent;
   const weekPct = weekBudget > 0 ? weekSpent / weekBudget : 0;
   const weekOver = weekSpent > weekBudget;
 
   // Month
   const monthBudget = MONTHLY_FREE;
-  const monthLeft = monthBudget - monthSpent;
   const monthPct = monthBudget > 0 ? monthSpent / monthBudget : 0;
   const monthOver = monthSpent > monthBudget;
 
@@ -128,8 +126,8 @@ export default async function HomePage() {
 
         <div className="flex items-start justify-center gap-6">
           <StatRing
-            value={dayOver ? `−${formatRMB(Math.abs(dayLeft))}` : formatRMB(dayLeft)}
-            unit={dayOver ? 'RMB OVER' : 'RMB LEFT'}
+            value={formatRMB(daySpent)}
+            unit={`/ ${formatRMB(dayBudget)} RMB`}
             pct={dayPct}
             over={dayOver}
             gradientId="ring-day"
@@ -139,8 +137,8 @@ export default async function HomePage() {
             label="DAY"
           />
           <StatRing
-            value={weekOver ? `−${formatRMB(Math.abs(weekLeft))}` : formatRMB(weekLeft)}
-            unit={weekOver ? 'RMB OVER' : 'RMB LEFT'}
+            value={formatRMB(weekSpent)}
+            unit={`/ ${formatRMB(WEEKLY_BUDGET)} RMB`}
             pct={weekPct}
             over={weekOver}
             gradientId="ring-week"
@@ -150,8 +148,8 @@ export default async function HomePage() {
             label="WEEK"
           />
           <StatRing
-            value={monthOver ? `−${formatRMB(Math.abs(monthLeft))}` : formatRMB(monthLeft)}
-            unit={monthOver ? 'RMB OVER' : 'RMB LEFT'}
+            value={formatRMB(monthSpent)}
+            unit={`/ ${formatRMB(monthBudget)} RMB`}
             pct={monthPct}
             over={monthOver}
             gradientId="ring-month"
