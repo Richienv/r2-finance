@@ -73,3 +73,15 @@ model Macro {
   @@index([date])
   @@index([type])
 }
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  entityId   String?
+  entityType String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actor, createdAt])
+}
