@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans, DM_Mono, Bebas_Neue } from 'next/font/google';
+import { Inter, Inter_Tight, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
-const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-dm-mono' });
-const bebas  = Bebas_Neue({ subsets: ['latin'], weight: '400', variable: '--font-bebas' });
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-inter' });
+const interTight = Inter_Tight({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter-tight' });
+const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-jetbrains' });
 
 export const metadata: Metadata = {
   title: 'R2·FINANCE',
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
+  themeColor: '#EFEDE6',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -22,8 +22,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable} ${bebas.variable}`}>
-      <body className="bg-bg text-white">{children}</body>
+    <html lang="en" className={`${inter.variable} ${interTight.variable} ${jetbrains.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

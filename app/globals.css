@@ -2,26 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
+
+* { box-sizing: border-box; }
 
 html, body {
-  background: #0a0a0a;
-  color: #fafafa;
-  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  margin: 0;
+  height: 100%;
+  background: #EFEDE6;
+  color: #141413;
+  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-html, body, #__next { height: 100%; }
-
 body { overscroll-behavior: none; }
 
-.hairline { border-width: 0.5px; border-color: #222; }
+::selection { background: #0047FF; color: #FAF9F5; }
 
-@keyframes shake-x {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-6px); }
-  40%      { transform: translateX(6px); }
-  60%      { transform: translateX(-4px); }
-  80%      { transform: translateX(4px); }
-}
-.shake-x { animation: shake-x 400ms ease-in-out; }
+input { outline: none; border: none; background: transparent; font-family: inherit; }
+button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ringPulse { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
