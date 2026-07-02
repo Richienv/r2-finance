@@ -1,15 +1,5 @@
-import { Suspense } from 'react';
-import { AppShell } from '@/components/AppShell';
-import { BottomNav } from '@/components/BottomNav';
-import { AddExpenseForm } from '@/components/AddExpenseForm';
+import { redirect } from 'next/navigation';
 
 export default function AddPage() {
-  return (
-    <AppShell>
-      <Suspense>
-        <AddExpenseForm />
-      </Suspense>
-      <BottomNav />
-    </AppShell>
-  );
+  redirect('/');
 }
