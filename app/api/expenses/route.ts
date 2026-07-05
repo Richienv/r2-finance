@@ -9,6 +9,7 @@ import {
 } from '@/lib/hermes';
 import { rmbToIdr } from '@/lib/money';
 import { logActivity, getActor } from '@/lib/audit';
+import { getOwnerUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +17,22 @@ export function OPTIONS() {
   return preflight();
 }
 
-// GET /api/expenses?from=YYYY-MM-DD — recent rows (public). Used by any puller
-// and for general read access. Defaults to the last 30 days if `from` omitted.
+// This CRUD surface is the agent's (owner-scoped). Mutations are gated by the
+// R2_FINANCE_API_KEY in middleware; everything here operates on the owner's data.
+async function requireOwner(): Promise<string | null> {
+  return getOwnerUserId();
+}
+
+// GET /api/expenses?from=YYYY-MM-DD — recent owner rows.
 export async function GET(req: NextRequest) {
+  const ownerId = await requireOwner();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
   try {
     const from = req.nextUrl.searchParams.get('from');
-    const where = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? { date: { gte: from } } : {};
+    const where =
+      from && /^\d{4}-\d{2}-\d{2}$/.test(from)
+        ? { userId: ownerId, date: { gte: from } }
+        : { userId: ownerId };
     const rows = await prisma.expense.findMany({
       where,
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
@@ -35,6 +46,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/expenses — create (auth). Structured/NL, same as log-expense.
 export async function POST(req: NextRequest) {
+  const ownerId = await requireOwner();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
   let body: LogExpenseBody;
   try {
     body = (await req.json()) as LogExpenseBody;
@@ -42,8 +55,9 @@ export async function POST(req: NextRequest) {
     return fail('bad-json', 'Request body must be valid JSON', 400);
   }
   try {
-    const result = await logExpenseFromInput(body);
+    const result = await logExpenseFromInput(ownerId, body);
     await logActivity({
+      userId: ownerId,
       actor: getActor(req),
       action: 'expense.create',
       entityId: result.expense.id,
@@ -60,6 +74,8 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/expenses — update amount/note/category by id (auth).
 export async function PATCH(req: NextRequest) {
+  const ownerId = await requireOwner();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
   let body: { id?: string; amountRMB?: number; note?: string; category?: string };
   try {
     body = await req.json();
@@ -72,7 +88,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.amountRMB === 'number') {
     if (!(body.amountRMB > 0)) return fail('invalid-amount', 'amountRMB must be > 0', 400);
     data.amountRMB = body.amountRMB;
-    data.amountIDR = rmbToIdr(body.amountRMB, await getRate());
+    data.amountIDR = rmbToIdr(body.amountRMB, await getRate(ownerId));
   }
   if (typeof body.note === 'string') data.note = body.note.trim() || null;
   if (body.category) {
@@ -82,36 +98,34 @@ export async function PATCH(req: NextRequest) {
   }
   if (Object.keys(data).length === 0) return fail('no-changes', 'nothing to update', 400);
 
-  try {
-    const expense = await prisma.expense.update({ where: { id: body.id }, data });
-    await logActivity({
-      actor: getActor(req),
-      action: 'expense.update',
-      entityId: expense.id,
-      entityType: 'Expense',
-      payload: { changes: data },
-    });
-    return ok({ expense });
-  } catch {
-    return fail('not-found', `No expense with id ${body.id}`, 404);
-  }
+  const { count } = await prisma.expense.updateMany({ where: { id: body.id, userId: ownerId }, data });
+  if (count === 0) return fail('not-found', `No expense with id ${body.id}`, 404);
+  await logActivity({
+    userId: ownerId,
+    actor: getActor(req),
+    action: 'expense.update',
+    entityId: body.id,
+    entityType: 'Expense',
+    payload: { changes: data },
+  });
+  return ok({ id: body.id, changes: data });
 }
 
 // DELETE /api/expenses?id=... — delete by id (auth). Completes the CRUD surface.
 export async function DELETE(req: NextRequest) {
+  const ownerId = await requireOwner();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return fail('missing-id', 'id query param is required', 400);
-  try {
-    const expense = await prisma.expense.delete({ where: { id } });
-    await logActivity({
-      actor: getActor(req),
-      action: 'expense.delete',
-      entityId: id,
-      entityType: 'Expense',
-      payload: { deleted: expense },
-    });
-    return ok({ deleted: expense });
-  } catch {
-    return fail('not-found', `No expense with id ${id}`, 404);
-  }
+  const { count } = await prisma.expense.deleteMany({ where: { id, userId: ownerId } });
+  if (count === 0) return fail('not-found', `No expense with id ${id}`, 404);
+  await logActivity({
+    userId: ownerId,
+    actor: getActor(req),
+    action: 'expense.delete',
+    entityId: id,
+    entityType: 'Expense',
+    payload: { deleted: id },
+  });
+  return ok({ deleted: id });
 }

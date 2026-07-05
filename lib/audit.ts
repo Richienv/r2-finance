@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
  * failure can never break the mutation it is auditing.
  */
 export async function logActivity(args: {
+  userId?: string | null;
   actor: string;
   action: string;
   entityId?: string;
@@ -14,6 +15,7 @@ export async function logActivity(args: {
   try {
     await prisma.activityLog.create({
       data: {
+        userId: args.userId ?? null,
         actor: args.actor,
         action: args.action,
         entityId: args.entityId ?? null,

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getMacros } from '@/app/actions/macro';
+import { requireUserId } from '@/lib/auth';
 import { cstDateString, currentMonthKey, weekRange, daysInMonth, daysUntilPayday } from '@/lib/date';
 import {
   MONTHLY_ALLOWANCE_IDR,
@@ -16,6 +17,7 @@ export type FinanceData = Awaited<ReturnType<typeof loadFinanceData>>;
  * variable-spending views — fixed costs surface via Settings + macro "FIXED OUT".
  */
 export async function loadFinanceData() {
+  const userId = await requireUserId();
   const today = cstDateString();
   const monthKey = currentMonthKey();
   const { start: weekStart, end: weekEnd, days: weekDays } = weekRange(new Date());
@@ -27,12 +29,12 @@ export async function loadFinanceData() {
 
   const [expenseRows, macroRows, settingsRow, fixedRows] = await Promise.all([
     prisma.expense.findMany({
-      where: { date: { gte: lo, lte: hi }, NOT: { category: 'FIXED' } },
+      where: { userId, date: { gte: lo, lte: hi }, NOT: { category: 'FIXED' } },
       orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
     }),
-    getMacros(),
-    prisma.monthlySettings.findUnique({ where: { month: monthKey } }),
-    prisma.fixedCost.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    getMacros(userId),
+    prisma.monthlySettings.findUnique({ where: { userId_month: { userId, month: monthKey } } }),
+    prisma.fixedCost.findMany({ where: { userId, active: true }, orderBy: { name: 'asc' } }),
   ]);
 
   const settings = settingsRow ?? {

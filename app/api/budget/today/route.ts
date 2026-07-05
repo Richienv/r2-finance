@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { ensureDailyBudget } from '@/lib/rolling-budget';
 import { cstDateString } from '@/lib/date';
+import { getOwnerUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const ownerId = await getOwnerUserId();
+  if (!ownerId) return NextResponse.json({ ok: false, error: 'no-owner' }, { status: 503 });
   const today = cstDateString();
-  const row = await ensureDailyBudget(today);
+  const row = await ensureDailyBudget(ownerId, today);
   const carryoverLabel =
     row.carryover > 0
       ? `+${Math.round(row.carryover)} bonus from yesterday`

@@ -31,7 +31,7 @@ function monthStartOf(date: string): string {
  * day's budget. Month boundary resets carry to 0.
  * Persists every computed day so historical reads stay consistent.
  */
-async function rebuildChain(upTo: string): Promise<RollingDay[]> {
+async function rebuildChain(userId: string, upTo: string): Promise<RollingDay[]> {
   const start = monthStartOf(upTo);
   const dates: string[] = [];
   let cur = start;
@@ -41,7 +41,7 @@ async function rebuildChain(upTo: string): Promise<RollingDay[]> {
   }
 
   const rows = await prisma.expense.findMany({
-    where: { date: { in: dates } },
+    where: { userId, date: { in: dates } },
     select: { date: true, amountRMB: true, category: true },
   });
   const spentMap: Record<string, number> = Object.fromEntries(dates.map(d => [d, 0]));
@@ -75,8 +75,9 @@ async function rebuildChain(upTo: string): Promise<RollingDay[]> {
   await Promise.all(
     out.map(row =>
       prisma.dailyBudget.upsert({
-        where: { date: row.date },
+        where: { userId_date: { userId, date: row.date } },
         create: {
+          userId,
           date: row.date,
           baseAmount: row.baseAmount,
           carryover: row.carryover,
@@ -96,13 +97,13 @@ async function rebuildChain(upTo: string): Promise<RollingDay[]> {
   return out;
 }
 
-export async function ensureDailyBudget(date: string): Promise<RollingDay> {
-  const chain = await rebuildChain(date);
+export async function ensureDailyBudget(userId: string, date: string): Promise<RollingDay> {
+  const chain = await rebuildChain(userId, date);
   return chain[chain.length - 1];
 }
 
-export async function getLast7Days(endDate: string = cstDateString()): Promise<RollingDay[]> {
-  const chain = await rebuildChain(endDate);
+export async function getLast7Days(userId: string, endDate: string = cstDateString()): Promise<RollingDay[]> {
+  const chain = await rebuildChain(userId, endDate);
   const last7 = chain.slice(-7);
   while (last7.length < 7) {
     // Pad with earlier (previous month) days as zero-spent placeholders.

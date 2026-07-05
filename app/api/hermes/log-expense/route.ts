@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { ok, fail, preflight } from '@/lib/http';
 import { logExpenseFromInput, type LogExpenseBody } from '@/lib/hermes';
 import { logActivity, getActor } from '@/lib/audit';
+import { getOwnerUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,9 @@ export function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const ownerId = await getOwnerUserId();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
+
   let body: LogExpenseBody;
   try {
     body = (await req.json()) as LogExpenseBody;
@@ -18,8 +22,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await logExpenseFromInput(body);
+    const result = await logExpenseFromInput(ownerId, body);
     await logActivity({
+      userId: ownerId,
       actor: getActor(req),
       action: 'expense.create',
       entityId: result.expense.id,

@@ -2,9 +2,17 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { requireUserId } from '@/lib/auth';
 import { cstDateString, currentMonthKey } from '@/lib/date';
 import { rmbToIdr } from '@/lib/money';
 import { IDR_PER_RMB, type Category, CATEGORIES } from '@/lib/constants';
+
+async function rateFor(userId: string): Promise<number> {
+  const settings = await prisma.monthlySettings.findUnique({
+    where: { userId_month: { userId, month: currentMonthKey() } },
+  });
+  return settings?.idrPerRmb ?? IDR_PER_RMB;
+}
 
 type AddExpenseInput = {
   amountRMB: number;
@@ -14,6 +22,7 @@ type AddExpenseInput = {
 };
 
 export async function addExpense(input: AddExpenseInput) {
+  const userId = await requireUserId();
   if (!Number.isFinite(input.amountRMB) || input.amountRMB <= 0) {
     throw new Error('amountRMB must be > 0');
   }
@@ -21,14 +30,11 @@ export async function addExpense(input: AddExpenseInput) {
     throw new Error('invalid category');
   }
   const date = input.date ?? cstDateString();
-
-  const settings = await prisma.monthlySettings.findUnique({
-    where: { month: currentMonthKey() },
-  });
-  const rate = settings?.idrPerRmb ?? IDR_PER_RMB;
+  const rate = await rateFor(userId);
 
   await prisma.expense.create({
     data: {
+      userId,
       date,
       amountRMB: input.amountRMB,
       amountIDR: rmbToIdr(input.amountRMB, rate),
@@ -43,7 +49,9 @@ export async function addExpense(input: AddExpenseInput) {
 }
 
 export async function deleteExpense(id: string) {
-  await prisma.expense.delete({ where: { id } });
+  const userId = await requireUserId();
+  const { count } = await prisma.expense.deleteMany({ where: { id, userId } });
+  if (count === 0) throw new Error('not found');
   revalidatePath('/');
   revalidatePath('/week');
   revalidatePath('/month');
@@ -56,21 +64,20 @@ type UpdateExpenseInput = {
 };
 
 export async function updateExpense(input: UpdateExpenseInput) {
+  const userId = await requireUserId();
   if (!Number.isFinite(input.amountRMB) || input.amountRMB <= 0) {
     throw new Error('amountRMB must be > 0');
   }
-  const settings = await prisma.monthlySettings.findUnique({
-    where: { month: currentMonthKey() },
-  });
-  const rate = settings?.idrPerRmb ?? IDR_PER_RMB;
-  await prisma.expense.update({
-    where: { id: input.id },
+  const rate = await rateFor(userId);
+  const { count } = await prisma.expense.updateMany({
+    where: { id: input.id, userId },
     data: {
       amountRMB: input.amountRMB,
       amountIDR: rmbToIdr(input.amountRMB, rate),
       note: input.note?.trim() || null,
     },
   });
+  if (count === 0) throw new Error('not found');
   revalidatePath('/');
   revalidatePath('/week');
   revalidatePath('/month');

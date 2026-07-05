@@ -75,20 +75,21 @@ export function parseNL(text: string): ParsedExpense | null {
 }
 
 /** Live IDR↔RMB rate: prefer this month's MonthlySettings, else the constant. */
-export async function getRate(): Promise<number> {
+export async function getRate(userId: string): Promise<number> {
   const settings = await prisma.monthlySettings.findUnique({
-    where: { month: currentMonthKey() },
+    where: { userId_month: { userId, month: currentMonthKey() } },
   });
   return settings?.idrPerRmb ?? IDR_PER_RMB;
 }
 
 /** Resolve a structured/NL request into the exact fields the Expense row needs. */
 export async function resolveExpense(args: {
+  userId: string;
   amount: number;
   currency?: 'RMB' | 'IDR';
   category: Category;
 }): Promise<{ amountRMB: number; amountIDR: number; rate: number }> {
-  const rate = await getRate();
+  const rate = await getRate(args.userId);
   if (args.currency === 'IDR') {
     const amountRMB = Math.round((args.amount / rate) * 100) / 100;
     return { amountRMB, amountIDR: Math.round(args.amount), rate };
@@ -124,7 +125,7 @@ export type LoggedExpense = {
  * fallback, then return the saved row plus the day's remaining budget and an
  * over-budget warning. Throws { code, message } on validation failure.
  */
-export async function logExpenseFromInput(body: LogExpenseBody): Promise<LoggedExpense> {
+export async function logExpenseFromInput(userId: string, body: LogExpenseBody): Promise<LoggedExpense> {
   let amount: number;
   let currency: 'RMB' | 'IDR';
   let category: Category;
@@ -156,13 +157,13 @@ export async function logExpenseFromInput(body: LogExpenseBody): Promise<LoggedE
   }
 
   const date = body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : cstDateString();
-  const { amountRMB, amountIDR } = await resolveExpense({ amount, currency, category });
+  const { amountRMB, amountIDR } = await resolveExpense({ userId, amount, currency, category });
 
   const expense = await prisma.expense.create({
-    data: { date, amountRMB, amountIDR, category, note },
+    data: { userId, date, amountRMB, amountIDR, category, note },
   });
 
-  const daily = await ensureDailyBudget(date);
+  const daily = await ensureDailyBudget(userId, date);
   const dailyRemaining = round(daily.budgetAmount - daily.spent);
   const warning =
     dailyRemaining < 0 ? `over daily budget by ${Math.abs(dailyRemaining)} RMB` : null;
@@ -191,12 +192,12 @@ export function byCategory(rows: { amountRMB: number; category: string }[]) {
 const round = (n: number) => Math.round(n * 100) / 100;
 
 // ── TODAY ────────────────────────────────────────────────────────────────────
-export async function getTodayData() {
+export async function getTodayData(userId: string) {
   const today = cstDateString();
   const [daily, monthRows, week] = await Promise.all([
-    ensureDailyBudget(today),
-    getMonthExpenses(),
-    getWeekExpenses(),
+    ensureDailyBudget(userId, today),
+    getMonthExpenses(userId),
+    getWeekExpenses(userId),
   ]);
 
   const monthSpent = sumRMB(monthRows, { excludeFixed: true });
@@ -228,8 +229,8 @@ export async function getTodayData() {
 }
 
 // ── BUDGET ───────────────────────────────────────────────────────────────────
-export async function getBudgetData() {
-  const rate = await getRate();
+export async function getBudgetData(userId: string) {
+  const rate = await getRate(userId);
   return {
     dailyFree: DAILY_FREE_BUDGET,
     monthlyVariable: MONTHLY_FREE,
@@ -241,10 +242,10 @@ export async function getBudgetData() {
 }
 
 // ── WEEK ─────────────────────────────────────────────────────────────────────
-export async function getWeekData(startDate?: string) {
+export async function getWeekData(userId: string, startDate?: string) {
   const anchor = startDate ? new Date(`${startDate}T00:00:00+08:00`) : new Date();
   const safeAnchor = isNaN(anchor.getTime()) ? new Date() : anchor;
-  const { start, days, rows } = await getWeekExpenses(safeAnchor);
+  const { start, days, rows } = await getWeekExpenses(userId, safeAnchor);
   const today = cstDateString();
 
   const free = rows.filter((r) => r.category !== 'FIXED');
@@ -275,9 +276,9 @@ export async function getWeekData(startDate?: string) {
 }
 
 // ── MONTH ────────────────────────────────────────────────────────────────────
-export async function getMonthData(month?: string) {
+export async function getMonthData(userId: string, month?: string) {
   const key = month && /^\d{4}-\d{2}$/.test(month) ? month : currentMonthKey();
-  const rows = await getMonthExpenses(key);
+  const rows = await getMonthExpenses(userId, key);
   const free = rows.filter((r) => r.category !== 'FIXED');
   const totalSpent = round(sumRMB(rows, { excludeFixed: true }));
 
@@ -303,9 +304,9 @@ const ID_MONTHS = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
 
-export async function getBrief(type: 'today' | 'week' | 'month' | 'warning-check'): Promise<string> {
+export async function getBrief(userId: string, type: 'today' | 'week' | 'month' | 'warning-check'): Promise<string> {
   if (type === 'today') {
-    const t = await getTodayData();
+    const t = await getTodayData(userId);
     const cat = t.topCategoryThisWeek ? ` — mostly ${t.topCategoryThisWeek}` : '';
     if (t.remainingToday < 0) {
       return `Udah over budget ${Math.abs(t.remainingToday)} RMB hari ini. Spent ${t.spentToday} sejauh ini${cat}. Rem dulu ya.`;
@@ -314,7 +315,7 @@ export async function getBrief(type: 'today' | 'week' | 'month' | 'warning-check
   }
 
   if (type === 'week') {
-    const w = await getWeekData();
+    const w = await getWeekData(userId);
     const topEntry = Object.entries(w.byCategory).sort((a, b) => b[1] - a[1])[0];
     const top = topEntry && topEntry[1] > 0 ? topEntry[0] : null;
     const over = w.daysOverBudget;
@@ -322,13 +323,13 @@ export async function getBrief(type: 'today' | 'week' | 'month' | 'warning-check
   }
 
   if (type === 'month') {
-    const m = await getMonthData();
+    const m = await getMonthData(userId);
     const [y, mo] = m.month.split('-').map(Number);
     return `${ID_MONTHS[mo - 1]} ${y}: ${m.remaining} sisa dari ${MONTHLY_FREE} variable budget. ${m.daysUntilPayday} hari lagi sampai payday.`;
   }
 
   // warning-check
-  const t = await getTodayData();
+  const t = await getTodayData(userId);
   if (t.remainingToday < 0) {
     return `Heads up: udah over daily budget ${Math.abs(t.remainingToday)} RMB. Tahan dulu jajannya.`;
   }

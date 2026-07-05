@@ -1,24 +1,24 @@
 import { prisma } from '@/lib/prisma';
 import { currentMonthKey, cstDateString, weekRange } from '@/lib/date';
 
-export async function getMonthExpenses(monthKey = currentMonthKey()) {
+export async function getMonthExpenses(userId: string, monthKey = currentMonthKey()) {
   return prisma.expense.findMany({
-    where: { date: { startsWith: monthKey } },
+    where: { userId, date: { startsWith: monthKey } },
     orderBy: { date: 'desc' },
   });
 }
 
-export async function getTodayExpenses(today = cstDateString()) {
+export async function getTodayExpenses(userId: string, today = cstDateString()) {
   return prisma.expense.findMany({
-    where: { date: today },
+    where: { userId, date: today },
     orderBy: { createdAt: 'desc' },
   });
 }
 
-export async function getWeekExpenses(now = new Date()) {
+export async function getWeekExpenses(userId: string, now = new Date()) {
   const { start, end, days } = weekRange(now);
   const rows = await prisma.expense.findMany({
-    where: { date: { gte: start, lte: end } },
+    where: { userId, date: { gte: start, lte: end } },
     orderBy: { date: 'asc' },
   });
   return { start, end, days, rows };
@@ -30,18 +30,19 @@ export function sumRMB(rows: { amountRMB: number; category: string }[], opts?: {
     .reduce((s, r) => s + r.amountRMB, 0);
 }
 
-export async function getBankBalance() {
+export async function getBankBalance(userId: string) {
   const [macroIncome, macroExpense, dailyExpense] = await Promise.all([
     prisma.macro.aggregate({
       _sum: { amountRMB: true },
-      where: { type: 'INCOME' },
+      where: { userId, type: 'INCOME' },
     }),
     prisma.macro.aggregate({
       _sum: { amountRMB: true },
-      where: { type: 'EXPENSE' },
+      where: { userId, type: 'EXPENSE' },
     }),
     prisma.expense.aggregate({
       _sum: { amountRMB: true },
+      where: { userId },
     }),
   ]);
 
@@ -68,15 +69,16 @@ export type TopPurchase = {
   source: 'DAILY' | 'MACRO';
 };
 
-export async function getTopPurchases(limit = 3): Promise<TopPurchase[]> {
+export async function getTopPurchases(userId: string, limit = 3): Promise<TopPurchase[]> {
   const [topExpenses, topMacro] = await Promise.all([
     prisma.expense.findMany({
+      where: { userId },
       orderBy: { amountRMB: 'desc' },
       take: limit,
       select: { id: true, note: true, category: true, amountRMB: true, date: true },
     }),
     prisma.macro.findMany({
-      where: { type: 'EXPENSE' },
+      where: { userId, type: 'EXPENSE' },
       orderBy: { amountRMB: 'desc' },
       take: limit,
       select: { id: true, note: true, category: true, amountRMB: true, date: true },
