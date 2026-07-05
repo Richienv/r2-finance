@@ -7,8 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  expenses        Expense[]
+  macros          Macro[]
+  incomes         Income[]
+  fixedCosts      FixedCost[]
+  monthlySettings MonthlySettings[]
+  dailyBudgets    DailyBudget[]
+  activityLogs    ActivityLog[]
+}
+
 model Expense {
   id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD CST
   amountRMB Float
   amountIDR Float
@@ -16,29 +34,39 @@ model Expense {
   note      String?
   createdAt DateTime @default(now())
 
-  @@index([date])
-  @@index([category])
+  @@index([userId, date])
+  @@index([userId, category])
 }
 
 model MonthlySettings {
   id           String @id @default(cuid())
-  month        String @unique // YYYY-MM
+  userId       String?
+  user         User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month        String // YYYY-MM
   allowanceIDR Int
   allowanceRMB Float
   idrPerRmb    Float
   paydayDay    Int
+
+  @@unique([userId, month])
 }
 
 model FixedCost {
   id         String  @id @default(cuid())
+  userId     String?
+  user       User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String
   amountRMB  Float
   billingDay Int?
   active     Boolean @default(true)
+
+  @@index([userId])
 }
 
 model Income {
   id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD CST
   amountRMB Float
   amountIDR Float
@@ -46,22 +74,28 @@ model Income {
   note      String?
   createdAt DateTime @default(now())
 
-  @@index([date])
-  @@index([source])
+  @@index([userId, date])
+  @@index([userId, source])
 }
 
 model DailyBudget {
   id           String   @id @default(cuid())
-  date         String   @unique // YYYY-MM-DD CST
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         String   // YYYY-MM-DD CST
   baseAmount   Float    // always 37
   carryover    Float    // positive = bonus, negative = debt
   budgetAmount Float    // clamp(base + carryover, 10, 100)
   spent        Float    @default(0)
   updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
 }
 
 model Macro {
   id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD CST
   amountRMB Float
   amountIDR Float
@@ -70,12 +104,14 @@ model Macro {
   note      String?
   createdAt DateTime @default(now())
 
-  @@index([date])
-  @@index([type])
+  @@index([userId, date])
+  @@index([userId, type])
 }
 
 model ActivityLog {
   id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   actor      String
   action     String
   entityId   String?
@@ -83,5 +119,5 @@ model ActivityLog {
   payload    Json?
   createdAt  DateTime @default(now())
 
-  @@index([actor, createdAt])
+  @@index([userId, createdAt])
 }

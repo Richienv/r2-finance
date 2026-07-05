@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { requireUserId } from '@/lib/auth';
 import { currentMonthKey } from '@/lib/date';
 
 export async function upsertSettings(input: {
@@ -10,10 +11,11 @@ export async function upsertSettings(input: {
   idrPerRmb: number;
   paydayDay: number;
 }) {
+  const userId = await requireUserId();
   const month = currentMonthKey();
   await prisma.monthlySettings.upsert({
-    where: { month },
-    create: { month, ...input },
+    where: { userId_month: { userId, month } },
+    create: { userId, month, ...input },
     update: { ...input },
   });
   revalidatePath('/');
@@ -22,19 +24,23 @@ export async function upsertSettings(input: {
 }
 
 export async function resetMonth() {
+  const userId = await requireUserId();
   const month = currentMonthKey();
-  await prisma.expense.deleteMany({ where: { date: { startsWith: month } } });
+  await prisma.expense.deleteMany({ where: { userId, date: { startsWith: month } } });
   revalidatePath('/');
   revalidatePath('/week');
   revalidatePath('/month');
 }
 
 export async function addFixedCost(input: { name: string; amountRMB: number; billingDay?: number }) {
-  await prisma.fixedCost.create({ data: { ...input, active: true } });
+  const userId = await requireUserId();
+  await prisma.fixedCost.create({ data: { userId, ...input, active: true } });
   revalidatePath('/settings');
 }
 
 export async function deleteFixedCost(id: string) {
-  await prisma.fixedCost.update({ where: { id }, data: { active: false } });
+  const userId = await requireUserId();
+  const { count } = await prisma.fixedCost.updateMany({ where: { id, userId }, data: { active: false } });
+  if (count === 0) throw new Error('not found');
   revalidatePath('/settings');
 }

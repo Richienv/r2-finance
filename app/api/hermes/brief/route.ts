@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { ok, fail, preflight } from '@/lib/http';
 import { getBrief } from '@/lib/hermes';
 import { logActivity, getActor } from '@/lib/audit';
+import { getOwnerUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,9 +26,12 @@ export async function POST(req: NextRequest) {
     return fail('bad-type', `type must be one of: ${TYPES.join(', ')}`, 400);
   }
 
+  const ownerId = await getOwnerUserId();
+  if (!ownerId) return fail('no-owner', 'Owner account not set up yet', 503);
+
   try {
-    const text = await getBrief(type);
-    await logActivity({ actor: getActor(req), action: 'brief.read', payload: { type } });
+    const text = await getBrief(ownerId, type);
+    await logActivity({ userId: ownerId, actor: getActor(req), action: 'brief.read', payload: { type } });
     return ok({ type, text });
   } catch (e) {
     return fail('brief-failed', e instanceof Error ? e.message : 'unavailable', 500);

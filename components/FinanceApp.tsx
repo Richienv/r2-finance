@@ -6,6 +6,7 @@ import type { FinanceData } from '@/app/finance-data';
 import { addExpense, deleteExpense } from '@/app/actions/expenses';
 import { addMacro, deleteMacro } from '@/app/actions/macro';
 import { upsertSettings, resetMonth, addFixedCost, deleteFixedCost } from '@/app/actions/settings';
+import { logout } from '@/app/actions/auth';
 import type { Category } from '@/lib/constants';
 
 // ── fonts ────────────────────────────────────────────────────────────────────
@@ -640,6 +641,7 @@ export function FinanceApp({ data, initialScreen = 'home' }: { data: FinanceData
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <button onClick={() => { if (confirm('Delete all this month’s daily expenses?')) persist(() => resetMonth()); }} style={{ height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E5E3DC', borderRadius: 2, background: '#FAF9F5', ...monoLbl(11, '.16em', '#A8362B'), cursor: 'pointer' }}>RESET THIS MONTH</button>
                   <a href="/api/export" style={{ height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E5E3DC', borderRadius: 2, ...monoLbl(11, '.16em', '#6B6B66'), textDecoration: 'none' }}>EXPORT CSV</a>
+                  <button onClick={() => startTransition(async () => { await logout(); router.replace('/login'); router.refresh(); })} style={{ height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #141413', borderRadius: 2, background: '#141413', ...monoLbl(11, '.16em', '#FAF9F5'), cursor: 'pointer' }}>LOG OUT</button>
                 </div>
               </div>
             </div>

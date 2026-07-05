@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ensureDailyBudget } from '@/lib/rolling-budget';
 import { cstDateString } from '@/lib/date';
+import { getOwnerUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,10 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
+    const ownerId = await getOwnerUserId();
+    if (!ownerId) throw new Error('no owner');
     const today = cstDateString();
-    const daily = await ensureDailyBudget(today);
+    const daily = await ensureDailyBudget(ownerId, today);
 
     const spent = Math.round(daily.spent);
     const remaining = Math.round(daily.budgetAmount - daily.spent);
